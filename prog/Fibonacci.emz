@@ -1,0 +1,119 @@
+//---------------------------------------------------------------------------------------------
+//	Fibonacci test code for EMZ1001 (c) 2022-... zpekic@hotmail.com
+//  Compile with https://github.com/zpekic/MicroCodeCompiler
+//---------------------------------------------------------------------------------------------
+// Test code to load into internal 1k ROM of Iskra EMZ1001 (AMI S2000) 4-bit microcontroller
+// http://www.bitsavers.org/components/ami/s2000/
+// Full description: (TBD link to hackaday project)
+//---------------------------------------------------------------------------------------------
+			.code 10, 8, fibonacci_code.mif, fibonacci_code.cgf, fibonacci_code.coe, emz:fibonacci_code.vhd, fibonacci_code.hex, fibonacci_code.bin, 8;
+			.symbol 10, 256, fibonacci_sym.mif, fibonacci_sym.cgf, fibonacci_sym.coe, emz:fibonacci_sym.vhd, fibonacci_sym.hex, fibonacci_sym.bin, 32;
+
+#include "emz1001.mcc";
+
+			.org 0;
+//	Execution starts at bank 0, page 0, location 0
+//	---------------------------------------------------------------------------
+			NOP;
+			LAI 0b1001;	// bit3 = 50Hz, bit0 = invert D lines on output
+			EUR;		// set prescaler and inverter
+			LAI 13;
+			XAB;		// BL = 13, A = don't care
+			PSH;		// set multiplex operation
+			LAI 14;
+			XAB;		// BL = 14, A = don't care
+			PSH;		// drive D outputs, do not float
+			LAI 15;
+			XAB;		// BL = 15, A = don't care
+			PSL;		// 
+			
+			LBZ 0;		// select RAM column 0, row 0
+			JMS  CLEAR;	// clear RAM column 0
+			
+			LBZ 1;		// select RAM column 1, row 0
+			JMS  CLEAR; // clear RAM column 1
+			
+			LBZ 1;		// select digit 0 in RAM column 1
+			STM 0;		// RAM[1,0] = 1
+			
+ADDLOOP:	JMS  BCDADD;	// RAM[2,*] = RAM[1,*] + RAM[2,*]
+			JMS  DISP_TTY;	// display to "teletype" (ASCII sequence output)
+
+DISPLOOP:	JMS  DISP_LED;	// display to 7-seg LEDs 
+			SOS;			// check if 1 second lapsed
+			JMP DISPLOOP;	// no, continue refreshing LEDs as fast as possible
+			
+			JMS  SHIFT0;	// RAM[0,*] = RAM[1,*]
+			
+			JMS  SHIFT1;	// RAM[1,*] = RAM[2,*]
+			
+			JMP ADDLOOP;	// RAM[0,*] and RAM[1,*] contain last two Fibonacci numbers, continue
+
+			.org 0b1111000000;
+//	Page 15 in the bank is the default place for subroutines
+// ----------------------------------------------------------------------------
+CLEAR:		LAI 0;			// A = 0, BU set by caller
+			XCI 0;			// Exchange with M[BU, BL], BU = BU, BL++
+			JMP CLEAR;		// repeat until all covered (BU = 0)
+			RT;				// back
+			
+SHIFT0:		LBZ 0b01;		// row (BL) = 0, col (BU) = 1
+SHIFT0LOOP:	LAM 0b01;		// A = M[1, BL], BU = 0 (LSB flipped)
+			XCI 0b01;		// exchange with M[0, BL], BU = 1 (LSB flipped back), BL++
+			JMP SHIFT0LOOP;	// repeat until all moved from column 1 to 0
+			RT;				
+			
+SHIFT1:		LBZ 0b10;		// start with column 2
+SHIFT1LOOP:	LAM 0b11;		// switch to column 1 (both bits flipped!)
+			XCI 0b10;		// switch back to column 2		
+			JMP SHIFT1LOOP;
+			RT;
+
+DISP_TTY:	RT;				// TODO
+
+DISP_LED:	LBF 0b10;		// select current Fibonacci number column (2), BL = 15
+			PSL;			// set all A lines low
+			XCD 0b00;		// BL = 14, keep BU
+			PSH;			// drive D lines, do not float them
+			XCD 0b00;		// BL = 13, keep BU
+			PSL;			// set static operation 
+			XCD 0b00;		// start displaying at digit 12 (9999999999999)
+			RSC;			// no decimal point displayed
+			LAI 15;			// 
+			XAE;			// E = 15
+LEDLOOP:	LAM 0b00;		// A <= M[BL, BU]
+			PSH;			// prepare anode selected by [BL] high
+			MVS;			// set anode states to A
+			DISN;			// Cathodes from A 7-seg decode
+			XCD	0b00;		// next, do not change column
+			JMP LEDLOOP;	
+			RT;
+			
+BCDADD:		LBZ 0;			// BL = 0, BU = 0
+			RSC;			// clear carry
+ALOOP:		LAM 0b01;		// A = M[0, BL], BU = 1
+			ADCS;			// C,A = A + M[1, BU] + C
+			NOP;			// don't care about carry out here
+			JMS  DAA;		// decimal adjust accumulator
+			XAE;			// save A in E
+			LAI 2;			// A = 2
+			XABU;			// BU = 2
+			XAE;			// restore A
+			XCI 0b10;		// M[2, BL] = A, BU = 0
+			JMP ALOOP;		// repeat until all 16 digits
+			RT;				// done
+			
+DAA:		SZC;
+			JMP V16_TO_18;	// if carry is set, we know it was 0x10 or above
+			ADIS 6;			// attempt a correction
+			JMP V0_TO_9;	// result was < 0x10, means no correction was needed
+			JMP ADJUSTED;
+			
+V0_TO_9:	ADIS 10;	// 6 + 10 = 16, meaning effectively adding "0"
+UNADJUSTED:	RSC;		// decimal carry forward
+			RT;
+			
+V16_TO_18:	ADIS 6;		// 0x12 becomes 0x18 etc., carry remains set
+ADJUSTED:	STC;		// decimal carry forward
+			RT;
+						
