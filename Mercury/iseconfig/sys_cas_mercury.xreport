@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <report-views version="2.0" >
  <header>
-  <DateModified>2022-10-30T12:01:11</DateModified>
+  <DateModified>2022-11-11T20:47:08</DateModified>
   <ModuleName>sys_emz1001_mercury</ModuleName>
-  <SummaryTimeStamp>2022-10-15T19:21:02</SummaryTimeStamp>
+  <SummaryTimeStamp>2022-11-11T20:17:21</SummaryTimeStamp>
   <SavedFilePath>C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/Mercury/iseconfig/sys_cas_mercury.xreport</SavedFilePath>
   <ImplementationReportsDirectory>C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/Mercury\</ImplementationReportsDirectory>
   <DateInitialized>2022-10-15T19:18:27</DateInitialized>

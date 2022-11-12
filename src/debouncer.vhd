@@ -38,7 +38,7 @@ end debouncer;
 
 architecture Behavioral of debouncer is
 
-signal debounced: std_logic;
+signal debounced: std_logic := '0';
 signal shifter: std_logic_vector(7 downto 0);
 signal all0, all1: std_logic;
 

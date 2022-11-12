@@ -34,7 +34,7 @@ entity adder16 is
            a : in  STD_LOGIC_VECTOR (15 downto 0);
            b : in  STD_LOGIC_VECTOR (15 downto 0);
            na : in  STD_LOGIC;
-			  nb : in  STD_LOGIC;
+           nb : in  STD_LOGIC;
            bcd : in  STD_LOGIC;
            y : out  STD_LOGIC_VECTOR (15 downto 0);
            cout : out  STD_LOGIC);
