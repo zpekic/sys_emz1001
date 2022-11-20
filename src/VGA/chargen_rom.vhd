@@ -31,7 +31,9 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity chargen_rom is
     Port ( a : in  STD_LOGIC_VECTOR (10 downto 0);
-           d : out  STD_LOGIC_VECTOR (7 downto 0));
+           h : in  STD_LOGIC_VECTOR (2 downto 0);
+			  pixel: out STD_LOGIC
+			);
 end chargen_rom;
 
 architecture Behavioral of chargen_rom is
@@ -182,7 +184,17 @@ pattern <= tinyfont(to_integer(unsigned(a(9 downto 0))));
 mask <= (others => a(10)); -- codes 128..255 are reverse pattern
 -- HACK HACK!!! all char patters and shifted right to compensate for messed up horizontal timing!
 --d <= mask xor ('0' & pattern(7 downto 1));
-d <= mask xor pattern;
+--d <= mask xor pattern;
+
+with h select
+	pixel <= (a(10) xor pattern(7)) when "000",
+				(a(10) xor pattern(6)) when "001",
+				(a(10) xor pattern(5)) when "010",
+				(a(10) xor pattern(4)) when "011",
+				(a(10) xor pattern(3)) when "100",
+				(a(10) xor pattern(2)) when "101",
+				(a(10) xor pattern(1)) when "110",
+				(a(10) xor pattern(0)) when others;
 
 end Behavioral;
 

@@ -26,6 +26,8 @@ impure function c(char: in character) return std_logic_vector;
 
 --type t_ascii is std_logic_vector(7 downto 0);
 
+type ram2k is array(0 to 2047) of std_logic_vector(7 downto 0);
+
 type lookup is array(0 to 15) of std_logic_vector(7 downto 0);
 constant hex2ascii: lookup := (
 	c('0'),

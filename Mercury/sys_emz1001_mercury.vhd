@@ -67,11 +67,11 @@ entity sys_emz1001_mercury is
 				--AUDIO_OUT_L, AUDIO_OUT_R: out std_logic;
 
 				-- 7seg LED on baseboard 
-				--A_TO_G: out std_logic_vector(6 downto 0); 
-				--AN: out std_logic_vector(3 downto 0); 
-				--DOT: out std_logic; 
+				A_TO_G: out std_logic_vector(6 downto 0); 
+				AN: out std_logic_vector(3 downto 0); 
+				DOT: out std_logic; 
 				-- 4 LEDs on Mercury board (3 and 2 are used by VGA VSYNC and HSYNC)
-				LED: inout std_logic_vector(3 downto 0);
+				LED: out std_logic_vector(1 downto 0);
 
 				-- ADC interface
 				-- channel	input
@@ -94,14 +94,14 @@ entity sys_emz1001_mercury is
 				--register state is traced to VGA after each instruction if SW0 = on
 				--640*480 50Hz mode is used, which give 80*60 character display
 				--but to save memory, only 80*50 are used which fits into 4k video RAM
-				--HSYNC: out std_logic;
-				--VSYNC: out std_logic;
-				--RED: out std_logic_vector(2 downto 0);
-				--GRN: out std_logic_vector(2 downto 0);
-				--BLU: out std_logic_vector(1 downto 0);
+				HSYNC: out std_logic;
+				VSYNC: out std_logic;
+				RED: out std_logic_vector(2 downto 0);
+				GRN: out std_logic_vector(2 downto 0);
+				BLU: out std_logic_vector(1 downto 0);
 				
 				--PMOD interface
-				PMOD: inout std_logic_vector(7 downto 0)
+				PMOD: inout std_logic_vector(3 downto 0)
           );
 end sys_emz1001_mercury;
 
@@ -110,6 +110,18 @@ architecture Structural of sys_emz1001_mercury is
 -- core components
 
 -- Misc components
+component fourdigitsevensegled is
+    Port ( -- inputs
+			  hexdata : in  STD_LOGIC_VECTOR (3 downto 0);
+           digsel : in  STD_LOGIC_VECTOR (1 downto 0);
+           showdigit : in  STD_LOGIC_VECTOR (3 downto 0);
+           showdot : in  STD_LOGIC_VECTOR (3 downto 0);
+			  -- outputs
+           anode : out  STD_LOGIC_VECTOR (3 downto 0);
+           segment : out  STD_LOGIC_VECTOR (7 downto 0)
+			 );
+end component;
+
 component clockgen is
     Port ( CLK : in  STD_LOGIC;
            RESET : in  STD_LOGIC;
@@ -121,7 +133,29 @@ component clockgen is
            vga_clk : out  STD_LOGIC;
            baudrate_x4 : out  STD_LOGIC;
            baudrate : out  STD_LOGIC;
-           freq50Hz : out  STD_LOGIC);
+           freq100Hz : out  STD_LOGIC;
+           freq50Hz : out  STD_LOGIC;
+			  freq1Hz : out STD_LOGIC);
+end component;
+
+component ttyvgawin is
+    Port ( reset : in  STD_LOGIC;
+           vga_clk : in  STD_LOGIC;
+			  tty_clk : in  STD_LOGIC;
+			  cur_clk : in  STD_LOGIC;
+           hsync : out  STD_LOGIC;
+           vsync : out  STD_LOGIC;
+           color : out  STD_LOGIC_VECTOR (11 downto 0);
+           row : out  STD_LOGIC_VECTOR (7 downto 0);
+           col : out  STD_LOGIC_VECTOR (7 downto 0);
+           win : in  STD_LOGIC;
+           win_color : in  STD_LOGIC;
+           win_char : in  STD_LOGIC_VECTOR (7 downto 0);
+           tty_send : in  STD_LOGIC;
+           tty_char : in  STD_LOGIC_VECTOR (7 downto 0);
+           tty_sent : out  STD_LOGIC;  
+			  -- not part of real device, used for debugging
+           debug : out  STD_LOGIC_VECTOR (31 downto 0));
 end component;
 
 component debouncer8channel is
@@ -168,15 +202,26 @@ signal button: std_logic_vector(3 downto 0);
 alias btn_ss: std_logic is button(0);
 
 --- frequency signals
-signal dot_clk: std_logic;
+signal vga_clk: std_logic;
 signal debounce_clk: std_logic;
 signal baudrate_x4, baudrate: std_logic;	
 signal cpu_clk: std_logic;
+signal freq100Hz, freq50Hz, freq1Hz: std_logic;
 
 -- loopback
 signal rx_char, tx_char: std_logic_vector(7 downto 0);
 signal rx_ready, tx_send: std_logic;
 
+-- video
+signal vga_row, vga_col: std_logic_vector(7 downto 0);
+signal win_row, win_col: std_logic_vector(7 downto 0);
+signal win: std_logic;
+ 
+-- other
+signal debug: std_logic_vector(31 downto 0);
+signal hexdata: std_logic_vector(3 downto 0);
+signal digsel: std_logic_vector(2 downto 0);
+ 
 begin   
 
 -- master reset
@@ -191,11 +236,44 @@ clocks: clockgen Port map (
 		pulse => btn_ss,
 		cpu_clk => cpu_clk,
 		debounce_clk => debounce_clk,
-		vga_clk => open,
+		vga_clk => vga_clk,
 		baudrate_x4 => baudrate_x4,
 		baudrate => baudrate,
-		freq50Hz => open
+		freq100Hz => freq100Hz,
+		freq50Hz => freq50Hz,
+		freq1Hz => freq1Hz
 		);
+
+-- video
+video: ttyvgawin port map ( 
+		reset => RESET,
+		vga_clk => vga_clk,
+		tty_clk => cpu_clk,
+		cur_clk => freq1Hz,
+		hsync => HSYNC,
+		vsync => VSYNC,
+		-- convert RRRRGGGGBBBB to RRRGGGBB (drop 1-2 LSB bits)
+		color(11 downto 9) => RED,
+		color(8) => open,
+		color(7 downto 5) => GRN,
+		color(4) => open,
+		color(3 downto 2) => BLU,
+		color(1 downto 0) => open,
+		row => vga_row,
+		col => vga_col,
+		win => win,
+		win_color => switch(7), -- TODO, drive from window data
+		win_char => tx_char,
+		tty_send => tx_send,
+		tty_char => tx_char,
+		tty_sent => open,
+		debug => debug
+	  );
+
+-- show 16*16 window with top, left at screen center
+win_row <= std_logic_vector(unsigned(vga_row) - 30);
+win_col <= std_logic_vector(unsigned(vga_col) - 40);
+win <= not (win_row(7) or win_row(6) or win_row(5) or win_row(4) or win_col(7) or win_col(6) or win_col(5) or win_col(4));
 
 -- simple loopback
 uart_rx: uart_ser2par Port map ( 
@@ -224,9 +302,34 @@ uart_tx: uart_par2ser Port map (
 -- LEDs
 LED(0) <= cpu_clk;
 LED(1) <= PMOD_TXD;
-LED(2) <= PMOD_RXD;
-LED(3) <= rx_ready;
+--LED(2) <= PMOD_RXD;
+--LED(3) <= rx_ready;
 	
+-- 7seg LED debug
+sevenseg: fourdigitsevensegled Port map (
+		-- inputs
+		hexdata => hexdata,
+		digsel => digsel(1 downto 0),
+		showdigit => "1111",
+		showdot => "0101",
+		-- outputs
+		anode => AN,
+		segment(7) => DOT,
+		segment(6 downto 0) => A_TO_G
+	);
+	
+digsel <= switch(7) & freq50Hz & freq100Hz;
+
+with digsel select hexdata <= 
+		debug(31 downto 28) when O"7",
+		debug(27 downto 24) when O"6",
+		debug(23 downto 20) when O"5",
+		debug(19 downto 16) when O"4",
+		debug(15 downto 12) when O"3",
+		debug(11 downto 8) when O"2",
+		debug(7 downto 4) when O"1",
+		debug(3 downto 0) when others;
+		
 -- condition input signals (switches and buttons)
 	debounce_sw: debouncer8channel Port map ( 
 		clock => debounce_clk, 

@@ -88,3 +88,7 @@ NET "adc_sck" 	LOC = "P9"  | IOSTANDARD = LVTTL ;
 NET "adc_csn"	LOC = "P12" | IOSTANDARD = LVTTL ;
 
 # CLOCK timing
+
+# HACK
+#NET "u_memc_ui_top/u_mem_intfc/phy_top0/u_phy_data_io/gen_dqs[0].u_phy_dqs_iob/u_iobuf_dqs/split_buf_net" S;
+#NET "video/tty/Mrom_tty_uinstruction_rom000050_f6" S;

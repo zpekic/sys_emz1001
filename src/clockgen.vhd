@@ -40,7 +40,9 @@ entity clockgen is
            vga_clk : out  STD_LOGIC;
            baudrate_x4 : out  STD_LOGIC;
            baudrate : out  STD_LOGIC;
-           freq50Hz : out  STD_LOGIC);
+           freq50Hz : out  STD_LOGIC;
+			  freq100Hz: out STD_LOGIC;
+			  freq1Hz: out STD_LOGIC);
 end clockgen;
 
 architecture Behavioral of clockgen is
@@ -87,6 +89,8 @@ with cpuclk_sel select cpu_clk <=
 debounce_clk <= freq_25M(8);	-- 25MHz/256 = 97.65625 kHz
 vga_clk <= freq_25M(0);			-- 25MHz/1 = 25MHz
 freq50Hz <= freq_1600(5);		-- 1600/32 = 50Hz
+freq100Hz <= freq_1600(4);		-- 1600/16 = 100Hz
+freq1Hz <= freq_2048(11);		-- 2048/2048 = 1Hz
 	
 prescale: process(CLK, baudrate_x8, freq4096, freq3200, baudrate_sel)
 begin
