@@ -108,6 +108,25 @@ end sys_emz1001_mercury;
 architecture Structural of sys_emz1001_mercury is
 
 -- core components
+component EMZ1001A is
+    Port ( CLK : in  STD_LOGIC;
+           nPOR : in  STD_LOGIC;
+           RUN : in  STD_LOGIC;
+           ROMS : in  STD_LOGIC;
+           KREF : in  STD_LOGIC;	-- not used
+           K : in  STD_LOGIC_VECTOR (3 downto 0);
+           I : in  STD_LOGIC_VECTOR (3 downto 0);
+           nEXTERNAL : out  STD_LOGIC;
+           SYNC : out  STD_LOGIC;
+           STATUS : out  STD_LOGIC;
+           A : out  STD_LOGIC_VECTOR (12 downto 0);
+           D : inout  STD_LOGIC_VECTOR (7 downto 0);
+			  -- debug
+			  dbg_sel: in STD_LOGIC_VECTOR(5 downto 0);
+			  dbg_mem: out STD_LOGIC_VECTOR(3 downto 0);
+			  dbg_reg: out STD_LOGIC_VECTOR(3 downto 0)
+			  );
+end component;
 
 -- Misc components
 component fourdigitsevensegled is
@@ -185,6 +204,49 @@ component uart_par2ser is
            txd : out  STD_LOGIC);
 end component;
 
+-- mask for a 16*16 window on VGA screen to display EMZ1001 internal data
+-- i00tmmmm -- hex value selected by "mmmm" looked up throug table "t" and possibly "i"nverted
+-- ixxxxxxx -- all other characters are ASCII, possibly "i"verted
+constant mask: mem256x8 := (
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('='),i(' '),i(' '),X"07" ,X"06" ,X"05" , X"04",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i('='),i(' '),i(' '),i(' '),i(' '),X"03" , X"02",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i('T'),X"11",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i('P'),i('C'),i(' '),X"01" ,X"01" ,X"01" ,X"01"
+);	
+
+-- used for Tx cycles etc.
+constant lookup1: mem16x8 := (
+	c('?'),
+	c('1'),
+	c('3'),
+	c('?'),
+	c('5'),
+	c('?'),
+	c('?'),
+	c('?'),
+	c('7'),
+	c('?'),
+	c('?'),
+	c('?'),
+	c('?'),
+	c('?'),
+	c('?'),
+	c('?')
+);
+
+
 signal RESET: std_logic;
 
 -- Connect to PmodUSBUART 
@@ -216,16 +278,52 @@ signal rx_ready, tx_send: std_logic;
 signal vga_row, vga_col: std_logic_vector(7 downto 0);
 signal win_row, win_col: std_logic_vector(7 downto 0);
 signal win: std_logic;
+signal mask_index: std_logic_vector(7 downto 0);
+signal win_mask, win_char: std_logic_vector(7 downto 0);
+signal win_hex: std_logic_vector(3 downto 0);
+
+-- EMZ1001A debug
+signal dbg_sel: std_logic_vector(5 downto 0);
+signal dbg_mem, dbg_reg: std_logic_vector(3 downto 0); 
+signal A: std_logic_vector(12 downto 0);
+signal D: std_logic_vector(7 downto 0);
+signal emz_i: std_logic_vector(3 downto 0);
+
  
 -- other
-signal debug: std_logic_vector(31 downto 0);
+signal dbg_tty: std_logic_vector(31 downto 0);
 signal hexdata: std_logic_vector(3 downto 0);
 signal digsel: std_logic_vector(2 downto 0);
+
  
 begin   
 
 -- master reset
 RESET <= USR_BTN;
+
+-- microcontroller!
+mc: EMZ1001A Port map ( 
+			CLK => cpu_clk,
+			nPOR => not RESET,
+			RUN => switch(7),
+			ROMS => '1',	-- only use internal ROM for program
+			KREF => '1',	-- not used
+			K => button(3 downto 0),
+			I => emz_i,
+--			I(3) => freq50Hz,	-- simulate 50Hz European mains frequency
+--			I(2 downto 0) => "000",
+			nEXTERNAL => open,
+			SYNC => open,
+			STATUS => open,
+			A => A,
+			D => D,
+			-- debug
+			dbg_sel => dbg_sel, 
+			dbg_mem => dbg_mem,
+			dbg_reg => dbg_reg
+		);
+
+emz_i <= freq50Hz & switch(2 downto 0);
 
 -- generate various frequencies
 clocks: clockgen Port map ( 
@@ -263,17 +361,42 @@ video: ttyvgawin port map (
 		col => vga_col,
 		win => win,
 		win_color => switch(7), -- TODO, drive from window data
-		win_char => tx_char,
+		win_char(7) => win_mask(7),
+		win_char(6 downto 0) => win_char(6 downto 0),
 		tty_send => tx_send,
 		tty_char => tx_char,
 		tty_sent => open,
-		debug => debug
+		debug => dbg_tty
 	  );
 
 -- show 16*16 window with top, left at screen center
 win_row <= std_logic_vector(unsigned(vga_row) - 30);
 win_col <= std_logic_vector(unsigned(vga_col) - 40);
 win <= not (win_row(7) or win_row(6) or win_row(5) or win_row(4) or win_col(7) or win_col(6) or win_col(5) or win_col(4));
+mask_index <= win_row(3 downto 0) & win_col(3 downto 0);
+win_mask <= mask(to_integer(unsigned(mask_index)));
+dbg_sel(3 downto 0) <= win_row(3 downto 0);
+dbg_sel(5 downto 4) <= win_col(2 downto 1) when (win_col(3) = '0') else win_col(1 downto 0); 
+
+-- select if character is direct pass-through or from data
+with win_mask(6 downto 4) select win_char <=
+	hex2ascii(to_integer(unsigned(win_hex))) when "000",	-- binary, octal, dec, hex
+	lookup1(to_integer(unsigned(win_hex))) when "001",		-- special
+	win_mask when others;
+
+-- select data for display
+with win_mask(3 downto 0) select win_hex <=
+	dbg_mem when X"0",
+	dbg_reg when X"1",
+	D(3 downto 0) when X"2",
+	D(7 downto 4) when X"3",
+	A(3 downto 0) when X"4",
+	A(7 downto 4) when X"5",
+	A(11 downto 8) when X"6",
+	"000" & A(12) when X"7",
+	X"F" when others;
+
+
 
 -- simple loopback
 uart_rx: uart_ser2par Port map ( 
@@ -321,14 +444,14 @@ sevenseg: fourdigitsevensegled Port map (
 digsel <= switch(7) & freq50Hz & freq100Hz;
 
 with digsel select hexdata <= 
-		debug(31 downto 28) when O"7",
-		debug(27 downto 24) when O"6",
-		debug(23 downto 20) when O"5",
-		debug(19 downto 16) when O"4",
-		debug(15 downto 12) when O"3",
-		debug(11 downto 8) when O"2",
-		debug(7 downto 4) when O"1",
-		debug(3 downto 0) when others;
+		dbg_tty(31 downto 28) when O"7",
+		dbg_tty(27 downto 24) when O"6",
+		dbg_tty(23 downto 20) when O"5",
+		dbg_tty(19 downto 16) when O"4",
+		dbg_tty(15 downto 12) when O"3",
+		dbg_tty(11 downto 8) when O"2",
+		dbg_tty(7 downto 4) when O"1",
+		dbg_tty(3 downto 0) when others;
 		
 -- condition input signals (switches and buttons)
 	debounce_sw: debouncer8channel Port map ( 

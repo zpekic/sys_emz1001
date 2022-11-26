@@ -106,7 +106,7 @@ signal vram_a, vga_a, tty_a: std_logic_vector(10 downto 0);
 signal mem: std_logic;
 signal mem_char: std_logic_vector(7 downto 0);
 signal mem_row, mem_col: std_logic_vector(7 downto 0);
-signal vram: ram2k := (others => c(' '));	-- initialize video RAM with space
+signal vram: mem2k8 := (others => c(' '));	-- initialize video RAM with space
 
 signal char: std_logic_vector(7 downto 0);
 signal char_clk, char_is_zero, char_sent: std_logic;

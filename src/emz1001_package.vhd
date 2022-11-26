@@ -10,26 +10,32 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use IEEE.NUMERIC_STD.ALL;
+use work.fibonacci_code.all;
 
 package emz1001_package is
 
 constant char_zero: std_logic_vector(7 downto 0) := X"00";
 constant char_lf: std_logic_vector(7 downto 0) := X"0A";
 constant char_cr: std_logic_vector(7 downto 0) := X"0D";
-constant char_e: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('E')), 8));
-constant char_i: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('I')), 8));
-constant char_r: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('R')), 8));
-constant char_equ: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('=')), 8));
-constant char_space: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos(' ')), 8));
+--constant char_e: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('E')), 8));
+--constant char_i: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('I')), 8));
+--constant char_r: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('R')), 8));
+--constant char_equ: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('=')), 8));
+--constant char_space: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos(' ')), 8));
 
 impure function c(char: in character) return std_logic_vector;
+impure function i(char: in character) return std_logic_vector;
 
 --type t_ascii is std_logic_vector(7 downto 0);
 
-type ram2k is array(0 to 2047) of std_logic_vector(7 downto 0);
+type mem1k8 is array(0 to 1023) of std_logic_vector(7 downto 0);
+type mem2k8 is array(0 to 2047) of std_logic_vector(7 downto 0);
+type mem256x8 is array(0 to 255) of std_logic_vector(7 downto 0);
 
-type lookup is array(0 to 15) of std_logic_vector(7 downto 0);
-constant hex2ascii: lookup := (
+impure function firmware return mem1k8;
+
+type mem16x8 is array(0 to 15) of std_logic_vector(7 downto 0);
+constant hex2ascii: mem16x8 := (
 	c('0'),
 	c('1'),
 	c('2'),
@@ -48,8 +54,8 @@ constant hex2ascii: lookup := (
 	c('F')
 );
 
-type table_16x16 is array (0 to 15) of std_logic_vector(15 downto 0);
-constant decode4to16: table_16x16 := (
+type mem16x16 is array (0 to 15) of std_logic_vector(15 downto 0);
+constant decode4to16: mem16x16 := (
 	"0000000000000001",
 	"0000000000000010",
 	"0000000000000100",
@@ -122,4 +128,21 @@ begin
 	return std_logic_vector(to_unsigned(natural(character'pos(char)), 8));
 end c;
  
+impure function i(char: in character) return std_logic_vector is
+begin
+	return X"80" xor c(char);
+end i;
+
+impure function firmware return mem1k8 is
+variable temp: mem1k8;
+begin
+	assert true report "FIRMWARE: start initializing" severity note;
+	for i in 0 to 1023 loop
+		temp(i) := emz_microcode(i);
+	end loop;
+	assert true report "FIRMWARE: done initializing" severity note;
+
+	return temp;
+end firmware;
+
 end emz1001_package;
