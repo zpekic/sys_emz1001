@@ -262,6 +262,34 @@ skp_lai & alu_nop & opr_lai,	-- LAI
 skp_lai & alu_nop & opr_lai	-- LAI
 ); 
 
+-- seven segment pattern for DISN instruction
+constant sevseg: mem16x8 := (
+	"01111110",	-- 0
+	"00110000",	-- 1
+	"01101101",	-- 2
+	"01111001",	-- 3
+	"00110011",	-- 4
+	"01011011",	-- 5
+	"01011111",	-- 6
+	"01110000",	-- 7
+	"01111111",	-- 8
+	"01111011",	-- 9
+	"01110111",	-- A
+	"00011111",	-- B
+	"01001110",	-- C
+	"00111101",	-- d
+	"01001111",	-- E
+	"01000111"	-- F
+);
+
+-- EUR lookup
+constant eur_lookup: mem4x14 := (
+	O"73" & X"FF",	-- 00	60Hz, inverting
+	O"73" & X"00",	-- 01 60Hz, not inverting (power-up default)
+	O"61" & X"FF",	-- 10	50Hz, inverting
+	O"61" & X"00"	-- 11 50Hz, not inverting
+);
+
 -- 4 phase timing clock
 signal t: std_logic_vector(3 downto 0);
 alias t1: std_logic is t(0);
@@ -275,15 +303,23 @@ signal ir_slave: std_logic_vector(12 downto 0);	-- only 13 bits go to A outputs
 signal ir_dout: std_logic_vector(7 downto 0);
 signal ir_k, ir_i: std_logic_vector(3 downto 0); 
 signal ir_mask: std_logic_vector(3 downto 0); -- inverted before loading! 
+signal ir_bank: std_logic_vector(2 downto 0); -- one of 8 1k banks
 
-signal ir_eur:	std_logic_vector(3 downto 0);		-- middle 2-bits are ignored
-alias ir_50Hz: std_logic is ir_eur(3);				-- 0: 60Hz on reset
-alias ir_d_noinvert: std_logic is ir_eur(0);		-- 1: non-inverted on reset
+signal ir_eur:	std_logic_vector(1 downto 0);		-- middle 2-bits from A are ignored
+--alias ir_50Hz: std_logic is ir_eur(3);				-- 0: 60Hz on reset
+--alias ir_d_noinvert: std_logic is ir_eur(0);		-- 1: non-inverted on reset
+
+signal ir_stack : mem4x10;
+signal ir_sp: std_logic_vector(1 downto 0);		-- 4 deep level stack (1 more than original, yay!)
+signal ir_pp: std_logic_vector(1 downto 0);		-- indicates if page/bank has been set up by PP instruction
+signal ir_newpage: std_logic_vector(3 downto 0);	-- new page initialized by PP
+signal ir_newbank: std_logic_vector(3 downto 0);	-- new bank initialized by PP (bit3 ignored)
 
 signal ir_current, ir_previous: std_logic_vector(7 downto 0);
+alias ir_target: std_logic_vector(5 downto 0) is ir_current(5 downto 0); -- 6-bit branch target for JMS, JMP
 
 -- programming model accessible registers
-signal mr_mem: mem64x4 := (others => X"0");
+signal mr_ram: mem64x4 := (others => X"0");
 signal mr_bl, mr_a, mr_e: std_logic_vector(3 downto 0);
 signal mr_bu: std_logic_vector(1 downto 0);
 signal mr_cy, mr_f1, mr_f2: std_logic;
@@ -294,15 +330,22 @@ alias mr_a_multiplexed: std_logic is mr_master(13);	-- 0: STATIC mode on reset
 
 -- other
 signal bl_is_13: std_logic;
-signal pc: std_logic_vector(12 downto 0);
-signal a_is_address: std_logic;
-signal mem: std_logic_vector(3 downto 0);	-- represents currently selected RAM cell
-signal mem_addr: std_logic_vector(5 downto 0);
+signal pc: std_logic_vector(9 downto 0);	-- covers lower 10 bits (1k bank)
+alias page: std_logic_vector(3 downto 0) is pc(9 downto 6);
+signal ram: std_logic_vector(3 downto 0);	-- represents currently selected RAM cell
+signal ram_addr: std_logic_vector(5 downto 0);
 signal y_alu: std_logic_vector(5 downto 0);	-- 6-bit ALU output
 signal y_skp: std_logic;
 signal bl_is_e, a_is_m, bl_is_0, bl_is_f, bit_is_1: std_logic;
 signal ik: std_logic_vector(3 downto 0);
+signal disn_out, disb_out: std_logic_vector(7 downto 0);
+
+alias i_clk: std_logic is I(3);	-- assume I3 is hooked up to 50/60Hz mains frequency
 signal sec: std_logic;	-- set when 1 second expires
+
+signal eur: std_logic_vector(13 downto 0);
+alias invert: std_logic_vector(7 downto 0) is eur(7 downto 0);	-- for XOR of DISP, DISN outputs
+alias limit: std_logic_vector(5 downto 0) is eur(13 downto 8);	-- to count toward 1s 
 
 signal pla: std_logic_vector(12 downto 0);
 alias skp: std_logic_vector(3 downto 0) is pla(12 downto 9);
@@ -310,10 +353,9 @@ alias alu: std_logic_vector(3 downto 0) is pla(8 downto 5);
 alias opr: std_logic_vector(4 downto 0) is pla(4 downto 0);
 
 -- debug
-signal dbg_int: std_logic_vector(3 downto 0);
+signal dbg_hi, dbg_lo: std_logic_vector(3 downto 0);
 
 begin
-
 -- SYNC is low at T1 and T3, high at T5 and T7
 SYNC <= t5 or t7; 
 
@@ -321,14 +363,20 @@ SYNC <= t5 or t7;
 STATUS <= (t1 and (not mr_d_driven)) or (t3 and bl_is_13) or (t5 and mr_cy) or (t7 and ir_skp);
 
 -- nEXT goes low when executing OUT
-nEXTERNAL <= '0' when (t7 = '1') else '1'; -- TODO!
+nEXTERNAL <= not(t7 and ir_run and (not ir_skp)) when (opr = opr_out) else '1'; 
 
 -- D is either floating, or driven from internal dout
 D <= ir_dout when (mr_d_driven = '1') else "ZZZZZZZZ";
-ir_dout <= bank0(to_integer(unsigned(pc(9 downto 0)))); --  TODO
 
--- A TODO!!
-A <= pc when (a_is_address = '1') else ir_slave;
+-- A is either program address of output latch
+A <= ir_bank & pc when ((mr_a_multiplexed and (t1 or t3)) = '1') else ir_slave;
+
+-- constant values set by EUR
+eur <= eur_lookup(to_integer(unsigned(ir_eur)));
+
+-- prepare output data for DISN and DISB
+disn_out <= invert xor (mr_cy & sevseg(to_integer(unsigned(mr_a)))(6 downto 0));	-- combine carry with lower 7 bits of 7seg lookup
+disb_out <= invert xor (ram & mr_a);															-- combine RAM and A
 
 -- instruction decode (256 op-codes split into 4*64 blocks)
 with ir_current(7 downto 6) select pla <=
@@ -338,20 +386,23 @@ with ir_current(7 downto 6) select pla <=
 	skp_0 & alu_nop & opr_jmp when others;	-- JMP
 
 -- RAM is pointed by BU and BL
-mem_addr <= mr_bu & mr_bl;
-mem <= mr_mem(to_integer(unsigned(mem_addr)));
+ram_addr <= mr_bu & mr_bl;
+ram <= mr_ram(to_integer(unsigned(ram_addr)));
+
+-- PC is pointed by the stack pointer
+pc <= ir_stack(to_integer(unsigned(ir_sp)));
 
 -- terribly non-optimal 6-bit wide ALU (carry-in + 4 bits + carry-out)
 with alu select y_alu <=
 		mr_cy & (mr_a xor X"F") & '0' when alu_inv,
-		mr_cy & (mr_a and mem) & '0' when alu_and,
-		mr_cy & (mr_a xor mem) & '0' when alu_xor,
+		mr_cy & (mr_a and ram) & '0' when alu_and,
+		mr_cy & (mr_a xor ram) & '0' when alu_xor,
 		mr_cy & mr_a(3 downto 2) & mr_bu & '0' when alu_bu,
-		std_logic_vector(unsigned('0' & mr_a & mr_cy) + unsigned('0' & mem & mr_cy)) when alu_adcs,
+		std_logic_vector(unsigned('0' & mr_a & mr_cy) + unsigned('0' & ram & mr_cy)) when alu_adcs,
 		std_logic_vector(unsigned('0' & mr_a & '0') + unsigned('0' & ir_current(3 downto 0) & '0')) when alu_adis,
-		std_logic_vector(unsigned('0' & mr_a & '0') + unsigned('0' & mem & '0')) when alu_add,
+		std_logic_vector(unsigned('0' & mr_a & '0') + unsigned('0' & ram & '0')) when alu_add,
 		mr_cy & mr_bl & '0' when alu_bl,
-		mr_cy & mem & '0' when alu_m,
+		mr_cy & ram & '0' when alu_m,
 		mr_cy & D(3 downto 0) & '0' when alu_d,
 		mr_cy & mr_e & '0' when alu_e,
 		mr_cy & mr_a & '0' when others;
@@ -380,50 +431,101 @@ bl_is_e <= '1' when (mr_bl = mr_e) else '0';
 bl_is_0 <= '1' when (mr_bl = X"0") else '0';
 bl_is_f <= '1' when (mr_bl = X"F") else '0';
 bl_is_13 <= '1' when (mr_bl = X"D") else '0';
-a_is_m <= '1' when (mr_a = mem) else '0';
+a_is_m <= '1' when (mr_a = ram) else '0';
 
 with ir_current(1 downto 0) select bit_is_1 <=
-	mem(0) when "00",
-	mem(1) when "01",
-	mem(2) when "10",
-	mem(3) when others;
+	ram(0) when "00",
+	ram(1) when "01",
+	ram(2) when "10",
+	ram(3) when others;
 
 with ir_current(0) select ik <= 
 	(ir_k or ir_mask) when '0', 		-- SZK 0x28
 	(ir_i or ir_mask) when others; 	-- SZI 0x29
+	
 -- most action happens on clock falling edge
 on_clk_down: process(CLK, nPOR)
 begin
 	if (nPOR = '0') then
+		-- one hot ring counter will start at T1
 		t <= "0001";
-		--pc <= (others => '0');
 		-- initialize some regs
 		ir_lai <= '1';		-- this is why first instruction should not be LAI
 		ir_lbx <= '1'; 	-- this is why first instruction should not be LBE, LBEP, LBF, LBZ
-		ir_eur <= "0001";	-- non 60Hz, normal polarity
+		ir_eur <= "01";	-- 60Hz, normal polarity
 		mr_master <= (others => '0');	-- static operation, float D lines
+		-- start at bank 0, page 0, location 0
+		ir_pp <= "00";						-- no pages set
+		ir_bank <= "000";					-- start at bank 0 (usually internal firmware)
+		ir_sp <= "00";						-- stack pointer
+		ir_stack(0) <= (others => '0');
 	else
 		if (falling_edge(CLK)) then
 			t <= t(2 downto 0) & t(3); -- one hot ring counter
-			--pc <= std_logic_vector(unsigned(pc) + 1);
-			if (t1 = '1') then
-			-- stuff happening in T1
-			end if;
+			--if (t1 = '1') then
+			-- no stuff happening in T1
+			--end if;
 			-- run FF was set at rising edge turing T3 so we have it for T3, T5, T7
 			if (ir_run = '1') then
 				if (t3 = '1') then
-				-- stuff happening in T3
-					if (ir_skp = '0') then
+				-- T3: regardless of skip, load instruction register
+				-- TODO: take SYNC into account to implement full instruction read logic
+					ir_previous <= ir_current;
+					if ((ROMS = '1') or (ir_bank = "000")) then
+						-- fetch from bank0 which is inside the chip
+						ir_current <= bank0(to_integer(unsigned(pc)));
+					else
+						-- fetch from any bank, outside of the chip
+						ir_current <= D;
 					end if;
 				end if;
 				if (t5 = '1') then
-				-- stuff happening in T5
+				-- T5: increment PC (page and location at current stack level)
+					ir_stack(to_integer(unsigned(ir_sp))) <= std_logic_vector(unsigned(pc) + 1);
+				-- T5: execution of most instructions happens here (if not skipped)
 					if (ir_skp = '0') then
 					end if;
 				end if;
 				if (t7 = '1') then
-				-- stuff happening in T7
+				-- T7: only JMP, JMS and RT/RTS are handled
 					if (ir_skp = '0') then
+						case opr is
+							when opr_jmp =>
+								case ir_pp is
+									when "00" =>	
+										-- no PP, jump to somewhere on same page
+										ir_stack(to_integer(unsigned(ir_sp))) <= page & ir_target; 
+									when "01" =>
+										-- single PP, jump to any page
+										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+									when others =>
+										-- two PPs, jump to any bank/page/location
+										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+										ir_bank <= ir_newbank(2 downto 0);
+								end case;
+								-- indicate that PPs were used
+								ir_pp <= "00";
+							when opr_jms =>
+								case ir_pp is
+									when "00" =>	
+										-- no PP, call to somewhere on page 15
+										ir_stack(to_integer(unsigned(ir_sp))) <= "1111" & ir_target; 
+									when "01" =>
+										-- single PP, call to any page
+										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+									when others =>
+										-- two PPs, call to any bank/page/location
+										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+										ir_bank <= ir_newbank(2 downto 0);
+								end case;
+								-- indicate that PPs were used
+								ir_pp <= "00";
+							when opr_ret =>
+								-- previous stack level
+								ir_sp <= std_logic_vector(unsigned(ir_sp) - 1);
+							when others =>
+								null;
+						end case;
 					end if;
 				end if;
 			end if;
@@ -450,20 +552,70 @@ begin
 	end if;
 end process;
 
+-- select debug outputs (RAM)
+dbg_mem <= mr_ram(to_integer(unsigned(dbg_sel)));
 
--- select debug outputs
-dbg_mem <= mr_mem(to_integer(unsigned(dbg_sel)));
+-- select debug outputs (other internal regs)
+----------------------------
+-- 	3		2		1		0
+----------------------------
+--	0	-		- 		0		T		-- ring counter clock
+-- 1	- 		- 		0		T		-- ring counter clock
+-- 2	- 		-		A		A		-- A output buffer
+-- 3	- 		-		A		A		-- A output buffer
+-- 4	- 		-	 	D		D		--	D output buffer
+--	5	-  	-		RUN	SKP	-- RUN and SKIP flags
+-- 6	- 		-		F2		F1		-- F2 and F1 flags
+-- 7	- 		-		0		CY		-- Carry flag
+-- 8	- 		-		0		E		-- E register
+-- 9	- 		-	 	0		A		-- Accumulator
+--	A	- 		-		0		BU		-- RAM column
+-- B	- 		-		0		BL		-- RAM row
+-- C	- 		-		0		M		-- currently selected RAM
+-- D	-		-		ip		ip		-- previous instruction register
+-- E	- 		-		ir		ir		-- instruction register
+-- F	bank	page	loc	loc	-- PC
+----------------------------
 
 with dbg_sel(5 downto 4) select dbg_reg <=
-	'0' & pc(12 downto 10) when "00",-- show as octal (bank)
-	pc(9 downto 6) when "01",			-- show as hex	(page)
-	'0' & pc(5 downto 3) when "10",	-- show as octal	(within a page)
-	dbg_int when others;
+	'0' & ir_bank 	when "00",	-- PC: bank as octal
+	pc(9 downto 6) when "01",	-- PC: page as hex
+	dbg_hi 			when "10",	
+	dbg_lo 			when others;
 	
-with dbg_sel(3 downto 0) select dbg_int <=
-	'0' & pc(2 downto 0) when X"F",	-- show as octal	(within a page)
-	-- TODO add other internal regs here!
-	t when others;
+with dbg_sel(3 downto 0) select dbg_lo <=
+	'0' & pc(2 downto 0) 	when X"F",	-- PC: location as octal
+	ir_current(3 downto 0) 	when X"E",
+	ir_previous(3 downto 0) when X"D",
+	ram							when X"C",
+	mr_bl 						when X"B",
+	"00" & mr_bu 				when X"A",
+	mr_a 							when X"9",
+	mr_e 							when X"8",
+	"000" & mr_cy 				when X"7",
+	"000" & mr_f1 				when X"6",
+	"000" & ir_skp 			when X"5",
+	ir_dout(3 downto 0) 		when X"4",
+	ir_slave(3 downto 0) 	when X"3",
+	ir_slave(11 downto 8) 	when X"2",
+	t 								when others;
+	
+with dbg_sel(3 downto 0) select dbg_hi <=
+	'0' & pc(5 downto 3) 	when X"F",	-- PC: location as octal
+	ir_current(7 downto 4) 	when X"E",
+	ir_previous(7 downto 4) when X"D",
+	X"0"							when X"C",
+	X"0"							when X"B",
+	X"0"			 				when X"A",
+	X"0" 							when X"9",
+	X"0" 							when X"8",
+	X"0"			 				when X"7",
+	"000" & mr_f2 				when X"6",
+	"000" & ir_run 			when X"5",
+	ir_dout(7 downto 4) 		when X"4",
+	ir_slave(7 downto 4) 	when X"3",
+	"000" & ir_slave(12) 	when X"2",
+	X"0"							when others;
 
 end Behavioral;
 
