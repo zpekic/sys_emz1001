@@ -73,11 +73,14 @@ signal baudrate_x8: std_logic;
 signal freq4096, freq3200: std_logic;
 signal prescale_baud, prescale_4096, prescale_3200: integer range 0 to 65535;
 	
+signal ss, ss_clk: std_logic;
+signal ss_ring: std_logic_vector(4 downto 0);
+
 begin
 
 -- connect to outputs
 with cpuclk_sel select cpu_clk <=
-	pulse when "000",	-- single step
+	ss when "000",	-- single step
 	freq_2048(11)	when "001",	-- 1
 	freq_2048(10)	when "010",	-- 2
 	freq_2048(9)	when "011",	-- 4
@@ -85,6 +88,22 @@ with cpuclk_sel select cpu_clk <=
 	freq_1600(6)	when "101",	-- 25
 	freq_1600(5)	when "110",	-- 50
 	freq_1600(4)	when others;	-- 100 
+	
+-- single step lets through 4 clock cycles and then stops until next "pulse" signal is received
+-- this way each press on the single-step button allows 1 full machine cycle
+ss_clk <= pulse when (ss_ring(0) = '1') else freq_2048(11);
+ss <= (not ss_ring(0)) and freq_2048(11);
+on_ss_clk: process(RESET, ss_clk, ss_ring)
+begin
+	if (RESET = '1') then
+		ss_ring <= "00001";
+	else
+		if (rising_edge(ss_clk)) then
+			ss_ring <= ss_ring(3 downto 0) & ss_ring(4);
+		end if;
+	end if;
+end process;
+-------------------------------------------------------
 	
 debounce_clk <= freq_25M(8);	-- 25MHz/256 = 97.65625 kHz
 vga_clk <= freq_25M(0);			-- 25MHz/1 = 25MHz

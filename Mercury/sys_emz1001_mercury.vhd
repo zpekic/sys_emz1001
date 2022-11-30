@@ -223,7 +223,7 @@ constant mask: mem256x8 := (
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('B'),i('U'),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('B'),i('L'),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('R'),i('A'),i('M'),i(' '),i(' '),i(' '),i(' '),X"01",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('I'),i('p'),i('r'),i('e'),i('v'),i(' '),X"01", X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('L'),i('B'),i('X'),i('L'),i('A'),i('I'),X"01", X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('I'),i('c'),i('u'),i('r'),i('r'),i(' '),X"01", X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('P'),i('C'),i(' '),i(' '),X"01" ,X"01" ,X"01" ,X"01"
 );	
@@ -327,6 +327,10 @@ mc: EMZ1001A Port map (
 
 emz_i <= freq50Hz & switch(2 downto 0);
 
+--DOT <= D(7);
+--A_TO_G <= D(6 downto 0);
+--AN(3 downto 0) <= A(3 downto 0);
+
 -- generate various frequencies
 clocks: clockgen Port map ( 
 		CLK => CLK, 	-- 50MHz on Mercury board
@@ -398,8 +402,6 @@ with win_mask(3 downto 0) select win_hex <=
 	"000" & A(12) when X"7",
 	X"F" when others;
 
-
-
 -- simple loopback
 uart_rx: uart_ser2par Port map ( 
 		reset => RESET, 
@@ -431,46 +433,49 @@ LED(1) <= PMOD_TXD;
 --LED(3) <= rx_ready;
 	
 -- 7seg LED debug
-sevenseg: fourdigitsevensegled Port map (
-		-- inputs
-		hexdata => hexdata,
-		digsel => digsel(1 downto 0),
-		showdigit => "1111",
-		showdot => "0101",
-		-- outputs
-		anode => AN,
-		segment(7) => DOT,
-		segment(6 downto 0) => A_TO_G
-	);
-	
-digsel <= switch(7) & freq50Hz & freq100Hz;
-
-with digsel select hexdata <= 
-		dbg_tty(31 downto 28) when O"7",
-		dbg_tty(27 downto 24) when O"6",
-		dbg_tty(23 downto 20) when O"5",
-		dbg_tty(19 downto 16) when O"4",
-		dbg_tty(15 downto 12) when O"3",
-		dbg_tty(11 downto 8) when O"2",
-		dbg_tty(7 downto 4) when O"1",
-		dbg_tty(3 downto 0) when others;
+--sevenseg: fourdigitsevensegled Port map (
+--		-- inputs
+--		hexdata => hexdata,
+--		digsel => digsel(1 downto 0),
+--		showdigit => "1111",
+--		showdot => "0101",
+--		-- outputs
+--		anode => AN,
+--		segment(7) => DOT,
+--		segment(6 downto 0) => A_TO_G
+--	);
+--	
+--digsel <= switch(7) & freq50Hz & freq100Hz;
+--
+--with digsel select hexdata <= 
+--		dbg_tty(31 downto 28) when O"7",
+--		dbg_tty(27 downto 24) when O"6",
+--		dbg_tty(23 downto 20) when O"5",
+--		dbg_tty(19 downto 16) when O"4",
+--		dbg_tty(15 downto 12) when O"3",
+--		dbg_tty(11 downto 8) when O"2",
+--		dbg_tty(7 downto 4) when O"1",
+--		dbg_tty(3 downto 0) when others;
 		
 -- condition input signals (switches and buttons)
-	debounce_sw: debouncer8channel Port map ( 
-		clock => debounce_clk, 
-		reset => RESET,
-		signal_raw => SW,
-		signal_debounced => switch
-	);
+--	debounce_sw: debouncer8channel Port map ( 
+--		clock => debounce_clk, 
+--		reset => RESET,
+--		signal_raw => SW,
+--		signal_debounced => switch
+--	);
 
-	debounce_btn: debouncer8channel Port map ( 
-		clock => debounce_clk, 
-		reset => RESET,
-		signal_raw(7 downto 4) => "0000",
-		signal_raw(3 downto 0) => BTN,
-		signal_debounced(7 downto 4) => open,
-		signal_debounced(3 downto 0) => button
-	);
+switch <= SW;
+
+--	debounce_btn: debouncer8channel Port map ( 
+--		clock => debounce_clk, 
+--		reset => RESET,
+--		signal_raw(7 downto 4) => "0000",
+--		signal_raw(3 downto 0) => BTN,
+--		signal_debounced(7 downto 4) => open,
+--		signal_debounced(3 downto 0) => button
+--	);
 	
+button <= BTN;
 		
 end;
