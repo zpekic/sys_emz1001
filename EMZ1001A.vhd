@@ -77,29 +77,38 @@ constant psx_mask: mem16x16 := (
 );
 
 -- PLA constants
-constant skp_0, alu_nop: std_logic_vector(3 downto 0) := X"0";
-constant skp_1, alu_inv: std_logic_vector(3 downto 0) := X"1";
-constant skp_sec, alu_and: std_logic_vector(3 downto 0) := X"2";
-constant skp_ble, alu_xor: std_logic_vector(3 downto 0) := X"3";
-constant skp_cy0, alu_bu: std_logic_vector(3 downto 0) := X"4";
-constant skp_cout, alu_adcs: std_logic_vector(3 downto 0) := X"5";
-constant skp_am, alu_adis: std_logic_vector(3 downto 0) := X"6";
-constant skp_bit, alu_add: std_logic_vector(3 downto 0) := X"7";
-constant skp_blf, alu_bl: std_logic_vector(3 downto 0) := X"8";
-constant skp_bl0, alu_m: std_logic_vector(3 downto 0) := X"9";
-constant skp_xa, alu_nopa: std_logic_vector(3 downto 0) := X"a";
-constant skp_xb, alu_nopb: std_logic_vector(3 downto 0) := X"b";
-constant skp_ik, alu_i: std_logic_vector(3 downto 0) := X"c";
-constant skp_skp, alu_d: std_logic_vector(3 downto 0) := X"d";
-constant skp_f1, alu_e: std_logic_vector(3 downto 0) := X"e";
-constant skp_f2, alu_cry: std_logic_vector(3 downto 0) := X"f";
+constant skp_0: std_logic_vector(3 downto 0) := X"0";
+constant skp_1: std_logic_vector(3 downto 0) := X"1";
+constant skp_sec: std_logic_vector(3 downto 0) := X"2";
+constant skp_ble: std_logic_vector(3 downto 0) := X"3";
+constant skp_cy0: std_logic_vector(3 downto 0) := X"4";
+constant skp_cout: std_logic_vector(3 downto 0) := X"5";
+constant skp_am: std_logic_vector(3 downto 0) := X"6";
+constant skp_bit: std_logic_vector(3 downto 0) := X"7";
+constant skp_blf: std_logic_vector(3 downto 0) := X"8";
+constant skp_bl0: std_logic_vector(3 downto 0) := X"9";
+constant skp_xa: std_logic_vector(3 downto 0) := X"a";
+constant skp_xb: std_logic_vector(3 downto 0) := X"b";
+constant skp_ik: std_logic_vector(3 downto 0) := X"c";
+constant skp_skp: std_logic_vector(3 downto 0) := X"d";
+constant skp_f1: std_logic_vector(3 downto 0) := X"e";
+constant skp_f2: std_logic_vector(3 downto 0) := X"f";
+
+constant alu_nop: std_logic_vector(2 downto 0) := O"0";
+constant alu_add: std_logic_vector(2 downto 0) := O"1";
+constant alu_adcs: std_logic_vector(2 downto 0) := O"2";
+constant alu_adis: std_logic_vector(2 downto 0) := O"3";
+constant alu_and: std_logic_vector(2 downto 0) := O"4";
+constant alu_xor: std_logic_vector(2 downto 0) := O"5";
+constant alu_cma: std_logic_vector(2 downto 0) := O"6";
+constant alu_cry: std_logic_vector(2 downto 0) := O"7";
 
 constant opr_nop: std_logic_vector(4 downto 0) := '0' & X"0";
 constant opr_brk: std_logic_vector(4 downto 0) := '0' & X"1";
 constant opr_ret: std_logic_vector(4 downto 0) := '0' & X"2";
 constant opr_sos: std_logic_vector(4 downto 0) := '0' & X"3";
 constant opr_psx: std_logic_vector(4 downto 0) := '0' & X"4";
-constant opr_cry: std_logic_vector(4 downto 0) := '0' & X"5";	-- NOT USED!
+constant opr_lae: std_logic_vector(4 downto 0) := '0' & X"5";	
 constant opr_alu: std_logic_vector(4 downto 0) := '0' & X"6";
 constant opr_xae: std_logic_vector(4 downto 0) := '0' & X"7";
 constant opr_inp: std_logic_vector(4 downto 0) := '0' & X"8";
@@ -110,8 +119,8 @@ constant opr_out: std_logic_vector(4 downto 0) := '0' & X"c";
 constant opr_xab: std_logic_vector(4 downto 0) := '0' & X"d";
 constant opr_jms: std_logic_vector(4 downto 0) := '0' & X"e";
 constant opr_jmp: std_logic_vector(4 downto 0) := '0' & X"f";
-constant opr_sf1: std_logic_vector(4 downto 0) := '1' & X"0";
-constant opr_sf2: std_logic_vector(4 downto 0) := '1' & X"1";
+constant opr_lab: std_logic_vector(4 downto 0) := '1' & X"0";
+constant opr_sfx: std_logic_vector(4 downto 0) := '1' & X"1";
 constant opr_xc0: std_logic_vector(4 downto 0) := '1' & X"2";
 constant opr_xci: std_logic_vector(4 downto 0) := '1' & X"3";
 constant opr_xcd: std_logic_vector(4 downto 0) := '1' & X"4";
@@ -128,7 +137,7 @@ constant opr_lai: std_logic_vector(4 downto 0) := '1' & X"e";
 constant opr_spp: std_logic_vector(4 downto 0) := '1' & X"f";
 
 -- PLA for instruction decode
-constant pla_00: mem64x13 := (
+constant pla_00: mem64x12 := (
 skp_0 & alu_nop & opr_nop,	-- NOP
 skp_0 & alu_nop & opr_brk,	-- BRK
 skp_0 & alu_nop & opr_ret,	--	RT
@@ -141,14 +150,14 @@ skp_ble & alu_nop & opr_nop,	-- SBE
 skp_cy0 & alu_nop & opr_nop,	-- SZC
 skp_0 & alu_cry & opr_alu,	-- STC
 skp_0 & alu_cry & opr_alu,	-- RSC
-skp_0 & alu_e & opr_nop,	-- LAE
-skp_0 & alu_e & opr_xae,	-- XAE
-skp_0 & alu_d & opr_inp,	-- INP
+skp_0 & alu_nop & opr_lae,	-- LAE
+skp_0 & alu_nop & opr_xae,	-- XAE
+skp_0 & alu_nop & opr_inp,	-- INP
 skp_0 & alu_nop & opr_eur,	-- EUR
-skp_0 & alu_inv & opr_alu,	-- CMA
-skp_0 & alu_bu & opr_xbu,	-- XABU
-skp_0 & alu_bl & opr_nop,	-- LAB
-skp_0 & alu_bl & opr_xab,	-- XAB
+skp_0 & alu_cma & opr_alu,	-- CMA
+skp_0 & alu_nop & opr_xbu,	-- XABU
+skp_0 & alu_nop & opr_lab,	-- LAB
+skp_0 & alu_nop & opr_xab,	-- XAB
 skp_cout & alu_adcs & opr_alu,	-- ADCS 
 skp_0 & alu_xor & opr_alu,	-- XOR
 skp_0 & alu_add & opr_alu,	-- ADD
@@ -171,31 +180,31 @@ skp_0 & alu_nop & opr_rsm,	-- RSM
 skp_0 & alu_nop & opr_rsm,	-- RSM
 skp_ik & alu_nop & opr_nop,	-- SZK
 skp_ik & alu_nop & opr_nop,	-- SZI
-skp_0 & alu_nop & opr_sf1,	-- RF1
-skp_0 & alu_nop & opr_sf1,	-- SF1
-skp_0 & alu_nop & opr_sf2,	-- RF2
-skp_0 & alu_nop & opr_sf2,	-- SF2
+skp_0 & alu_nop & opr_sfx,	-- RF1
+skp_0 & alu_nop & opr_sfx,	-- SF1
+skp_0 & alu_nop & opr_sfx,	-- RF2
+skp_0 & alu_nop & opr_sfx,	-- SF2
 skp_f1 & alu_nop & opr_nop,	-- TF1
 skp_f2 & alu_nop & opr_nop,	-- TF2
-skp_blf & alu_m & opr_xci,	-- XCI
-skp_blf & alu_m & opr_xci,	-- XCI
-skp_blf & alu_m & opr_xci,	-- XCI
-skp_blf & alu_m & opr_xci,	-- XCI
-skp_bl0 & alu_m & opr_xcd,	-- XCD
-skp_bl0 & alu_m & opr_xcd,	-- XCD
-skp_bl0 & alu_m & opr_xcd,	-- XCD
-skp_bl0 & alu_m & opr_xcd,	-- XCD
-skp_0 & alu_m & opr_xc0,	-- XC
-skp_0 & alu_m & opr_xc0,	-- XC
-skp_0 & alu_m & opr_xc0,	-- XC
-skp_0 & alu_m & opr_xc0,	-- XC
-skp_0 & alu_m & opr_lam,	-- LAM
-skp_0 & alu_m & opr_lam,	-- LAM
-skp_0 & alu_m & opr_lam,	-- LAM
-skp_0 & alu_m & opr_lam 	-- LAM
+skp_blf & alu_nop & opr_xci,	-- XCI
+skp_blf & alu_nop & opr_xci,	-- XCI
+skp_blf & alu_nop & opr_xci,	-- XCI
+skp_blf & alu_nop & opr_xci,	-- XCI
+skp_bl0 & alu_nop & opr_xcd,	-- XCD
+skp_bl0 & alu_nop & opr_xcd,	-- XCD
+skp_bl0 & alu_nop & opr_xcd,	-- XCD
+skp_bl0 & alu_nop & opr_xcd,	-- XCD
+skp_0 & alu_nop & opr_xc0,	-- XC
+skp_0 & alu_nop & opr_xc0,	-- XC
+skp_0 & alu_nop & opr_xc0,	-- XC
+skp_0 & alu_nop & opr_xc0,	-- XC
+skp_0 & alu_nop & opr_lam,	-- LAM
+skp_0 & alu_nop & opr_lam,	-- LAM
+skp_0 & alu_nop & opr_lam,	-- LAM
+skp_0 & alu_nop & opr_lam 	-- LAM
 );
 
-constant pla_01: mem64x13 := (
+constant pla_01: mem64x12 := (
 skp_0 & alu_nop & opr_lbz,	-- LBZ
 skp_0 & alu_nop & opr_lbz,	-- LBZ
 skp_0 & alu_nop & opr_lbz,	-- LBZ
@@ -347,18 +356,18 @@ alias mr_d_driven: std_logic is mr_master(14);			-- 0: FLOAT mode on reset
 alias mr_a_multiplexed: std_logic is mr_master(13);	-- 0: STATIC mode on reset
 
 -- other
-signal bl_is_13: std_logic;
 signal pc: std_logic_vector(9 downto 0);	-- covers lower 10 bits (1k bank)
 alias page: std_logic_vector(3 downto 0) is pc(9 downto 6);
 signal ram: std_logic_vector(3 downto 0);	-- represents currently selected RAM cell
 signal ram_addr: std_logic_vector(5 downto 0);
 signal y_alu: std_logic_vector(5 downto 0);	-- 6-bit ALU output
 signal y_skp: std_logic;
-signal bl_is_e, a_is_m, bl_is_0, bl_is_f, bit_is_1: std_logic;
+signal bl_is_e, a_is_m, bl_is_0, bl_is_f, bit_is_1, bl_is_13: std_logic;
 signal ik: std_logic_vector(3 downto 0);
 signal disn_out, disb_out, dout: std_logic_vector(7 downto 0);
-signal mask8: std_logic_vector(7 downto 0);
+signal skp_mask, mask8: std_logic_vector(7 downto 0);
 signal out_exe: std_logic;
+signal bu_xor: std_logic_vector(1 downto 0);
 
 alias i_clk: std_logic is I(3);	-- assume I3 is hooked up to 50/60Hz mains frequency
 signal sec: std_logic;	-- set when 1 second expires
@@ -369,13 +378,17 @@ alias eur_invert: std_logic_vector(7 downto 0) is eur(7 downto 0);	-- for XOR of
 alias eur_limit: std_logic_vector(5 downto 0) is eur(13 downto 8);	-- to count toward 1s 
 
 signal bl_incdec: std_logic_vector(7 downto 0);
-alias bl_inc: std_logic_vector(3 downto 0) is bl_incdec(7 downto 4);
+alias bl_inc: std_logic_vector(3 downto 0) is bl_incdec(7 downto 4); -- 16 values, 4 bits
 alias bl_dec: std_logic_vector(3 downto 0) is bl_incdec(3 downto 0);
 
+signal sp_incdec: std_logic_vector(3 downto 0);
+alias sp_inc: std_logic_vector(1 downto 0) is sp_incdec(3 downto 2);	-- 4 values, 2 bits
+alias sp_dec: std_logic_vector(1 downto 0) is sp_incdec(1 downto 0);
+
 -- instruction decode
-signal pla: std_logic_vector(12 downto 0);
-alias skp: std_logic_vector(3 downto 0) is pla(12 downto 9);
-alias alu: std_logic_vector(3 downto 0) is pla(8 downto 5);
+signal pla: std_logic_vector(11 downto 0);
+alias skp: std_logic_vector(3 downto 0) is pla(11 downto 8);
+alias alu: std_logic_vector(2 downto 0) is pla(7 downto 5);
 alias opr: std_logic_vector(4 downto 0) is pla(4 downto 0);
 
 -- debug
@@ -406,12 +419,24 @@ eur <= eur_lookup(to_integer(unsigned(ir_eur)));
 -- prepare mask for PSL/PSH
 psx <= psx_mask(to_integer(unsigned(mr_bl)));
 
+-- when skip flag is set, force a NOP to be loaded into instruction register
+skp_mask <= X"00" when (ir_skp = '1') else X"FF";
+
 -- prepare output data for DISN and DISB
 disn_out <= eur_invert xor (mr_cy & sevseg(to_integer(unsigned(mr_a)))(6 downto 0));	-- combine carry with lower 7 bits of 7seg lookup
 disb_out <= eur_invert xor (ram & mr_a);																-- combine RAM and A
 
--- save 2 adders
+-- save a few adders
 bl_incdec <= incdec(to_integer(unsigned(mr_bl)));
+
+with ir_sp select sp_incdec <=
+	"0111" when "00",
+	"1000" when "01",
+	"1101" when "10",
+	"0010" when others;
+
+-- and a few xors
+bu_xor <= mr_bu xor (ir_current(1 downto 0) xor "11");
 
 -- instruction decode (256 op-codes split into 4*64 blocks)
 with ir_current(7 downto 6) select pla <=
@@ -429,20 +454,14 @@ pc <= ir_stack(to_integer(unsigned(ir_sp)));
 
 -- terribly non-optimal 6-bit wide ALU (carry-in + 4 bits + carry-out)
 with alu select y_alu <=
-		mr_cy & (mr_a xor X"F") & '0' 	when alu_inv,
+		mr_cy & (mr_a xor X"F") & '0' 	when alu_cma,
 		mr_cy & (mr_a and ram) & '0' 		when alu_and,
 		mr_cy & (mr_a xor ram) & '0' 		when alu_xor,
-		mr_cy & mr_a(3 downto 2) & mr_bu & '0' when alu_bu,
 		std_logic_vector(unsigned('0' & mr_a & mr_cy) + unsigned('0' & ram & mr_cy)) 						when alu_adcs,
 		std_logic_vector(unsigned('0' & mr_a & '0') + unsigned('0' & ir_current(3 downto 0) & '0')) 	when alu_adis,
 		std_logic_vector(unsigned('0' & mr_a & '0') + unsigned('0' & ram & '0')) 							when alu_add,
-		mr_cy & mr_bl & '0' 							when alu_bl,
-		mr_cy & ir_current(3 downto 0) & '0' 	when alu_i,
-		mr_cy & ram & '0' 							when alu_m,
-		mr_cy & D(3 downto 0) & '0' 				when alu_d,
-		mr_cy & mr_e & '0' 							when alu_e,
-		not(ir_current(0)) & mr_a & '0'			when alu_cry,	-- passthrough to set carry flag
-		mr_cy & mr_a & '0' 							when others;
+		not(ir_current(0)) & mr_a & '0'	when alu_cry,	-- passthrough to set carry flag
+		mr_cy & mr_a & '0' 					when others;
 
 -- select source for updated skip flag (16 to 1 mux)
 with skp select y_skp <=
@@ -515,23 +534,24 @@ begin
 					--ir_previous <= ir_current;
 					if ((ROMS = '1') or (ir_bank = "000")) then
 						-- fetch from bank0 which is inside the chip
-						ir_current <= bank0(to_integer(unsigned(pc)));
+						ir_current <= skp_mask and bank0(to_integer(unsigned(pc)));
 					else
 						-- fetch from any bank, outside of the chip
-						ir_current <= D;
+						ir_current <= skp_mask and D;
 					end if;
 				end if;
 				if (t5 = '1') then
 				-- T5: increment PC (page and location at current stack level)
 					ir_stack(to_integer(unsigned(ir_sp))) <= std_logic_vector(unsigned(pc) + 1);
+				-- update skip flag based on the currectly executed instruction
+					ir_skp <= y_skp; 
 				-- T5: execution of most instructions happens here (if not skipped)
-					if (ir_skp = '0') then
-						ir_skp <= y_skp; -- update skip flag based on the currectly executed instruction
+				--	if (ir_skp = '0') then
 						case opr is
 							when opr_lai =>
 								ir_lbx <= '0';
 								if (ir_lai = '0') then	-- only execute if previous was not LAI
-									mr_a <= y_alu(4 downto 1);
+									mr_a <= ir_current(3 downto 0);
 									ir_mask <= ir_current(3 downto 0);
 									ir_lai <= '1';
 								end if;
@@ -567,8 +587,6 @@ begin
 								-- reset LAI and LBX flags for all other instructions
 								ir_lai <= '0';
 								ir_lbx <= '0';
-								-- always load A
-								mr_a <= y_alu(4 downto 1);
 								case opr is
 									when opr_nop =>	-- NOP
 										null;
@@ -585,11 +603,18 @@ begin
 											mr_master <= mr_master and (psx xor X"FFFF"); -- PSL
 										end if;
 									when opr_alu =>	-- ADD, ADCS, ADIS, AND, XOR, CMA, STC, RSC 
-										mr_cy <= y_alu(5); -- A already loaded by default
+										mr_cy <= y_alu(5); 
+										mr_a <= y_alu(4 downto 1);
 									when opr_xae =>	-- XAE
-										mr_e <= mr_a;	-- A loading from E by default 
+										mr_e <= mr_a;	
+										mr_a <= mr_e;
+									when opr_lae =>	-- LAE
+										mr_a <= mr_e;
+									when opr_lab =>	-- LAB
+										mr_a <= mr_bl;
 									when opr_inp =>	-- INP
 										mr_ram(to_integer(unsigned(ram_addr))) <= D(7 downto 4);
+										mr_a <= D(3 downto 0);
 									when opr_eur =>	-- EUR
 										ir_eur <= mr_a(3) & mr_a(0); -- middle 2 bits are ignored
 									when opr_dsb =>	-- DISB
@@ -600,29 +625,37 @@ begin
 										null;				-- no register changes, D is just driven from RAM & A during T5, T7
 									when opr_xab =>	-- XAB
 										mr_bl <= mr_a;	
+										mr_a <= mr_bl;
 									when opr_jms =>	-- JMS
-										ir_sp <= std_logic_vector(unsigned(ir_sp) + 1); -- prepare for new stack level
+										ir_sp <= sp_inc; -- prepare for new stack level
 									when opr_jmp =>	-- JMP
 										null;				-- handled during T7
-									when opr_sf1 =>	-- SF1, RF1
-										mr_f1 <= ir_current(0);
-									when opr_sf2 =>	-- SF2, RF2
-										mr_f2 <= ir_current(0);
+									when opr_sfx =>	-- SF1, RF1, SF2, RF2
+										if (ir_current(1) = '1') then
+											mr_f1 <= ir_current(0);
+										else
+											mr_f2 <= ir_current(0);
+										end if;
 									when opr_xc0 =>	-- XC
 										mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
-										mr_bu <= mr_bu xor (ir_current(1 downto 0) xor "11");
+										mr_a <= ram;
+										mr_bu <= bu_xor;
 									when opr_xci =>	-- XCI
 										mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
-										mr_bu <= mr_bu xor (ir_current(1 downto 0) xor "11");
+										mr_a <= ram;
+										mr_bu <= bu_xor;
 										mr_bl <= bl_inc;
 									when opr_xcd =>	-- XCD
 										mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
-										mr_bu <= mr_bu xor (ir_current(1 downto 0) xor "11");
+										mr_a <= ram;
+										mr_bu <= bu_xor;
 										mr_bl <= bl_dec;
 									when opr_lam =>	-- LAM
-										mr_bu <= mr_bu xor (ir_current(1 downto 0) xor "11");
+										mr_a <= ram;
+										mr_bu <= bu_xor;
 									when opr_xbu =>	-- XABU
 										mr_bu <= mr_a(1 downto 0);
+										mr_a(1 downto 0) <= mr_bu;
 									when opr_mvs =>	-- MVS
 										ir_slave <= mr_master(12 downto 0);
 									when opr_stm =>	-- STM
@@ -633,10 +666,10 @@ begin
 										case ir_pp is
 											when "00" =>
 												ir_newpage <= ir_current(3 downto 0) xor X"F";
-												ir_pp <= std_logic_vector(unsigned(ir_pp) + 1);
+												ir_pp <= "01";
 											when "01" =>
 												ir_newbank <= ir_current(3 downto 0) xor X"F";
-												ir_pp <= std_logic_vector(unsigned(ir_pp) + 1);
+												ir_pp <= "10";
 											when others =>
 												-- subsequent PP instructions just change the bank
 												ir_newbank <= ir_current(3 downto 0) xor X"F";						
@@ -645,11 +678,11 @@ begin
 										null; -- TODO: possibly HCF? (Halt and catch fire)
 								end case;
 						end case;
-					end if;
+					--end if;
 				end if;
 				if (t7 = '1') then
 				-- T7: only JMP, JMS and RT/RTS are handled
-					if (ir_skp = '0') then
+				--	if (ir_skp = '0') then
 						case opr is
 							when opr_jmp =>
 								case ir_pp is
@@ -683,11 +716,11 @@ begin
 								ir_pp <= "00";
 							when opr_ret =>
 								-- previous stack level
-								ir_sp <= std_logic_vector(unsigned(ir_sp) - 1);
+								ir_sp <= sp_dec;
 							when others =>
 								null;
 						end case;
-					end if;
+					--end if;
 				end if;
 			end if;
 		end if;
@@ -733,7 +766,7 @@ dbg_mem <= mr_ram(to_integer(unsigned(dbg_sel)));
 --	A	- 		-		0		BU		-- RAM column
 -- B	- 		-		0		BL		-- RAM row
 -- C	- 		-		0		M		-- currently selected RAM
--- D	-		-		ip		ip		-- previous instruction register
+-- D	-		-		0		sp		-- stack pointer
 -- E	- 		-		ir		ir		-- instruction register
 -- F	bank	page	loc	loc	-- PC
 ----------------------------
@@ -747,7 +780,7 @@ with dbg_sel(5 downto 4) select dbg_reg <=
 with dbg_sel(3 downto 0) select dbg_lo <=
 	'0' & pc(2 downto 0) 	when X"F",	-- PC: location as octal
 	ir_current(3 downto 0) 	when X"E",
-	"000" & ir_lai 			when X"D",
+	"00" & ir_sp	 			when X"D",
 	ram							when X"C",
 	mr_bl 						when X"B",
 	"00" & mr_bu 				when X"A",
@@ -764,7 +797,7 @@ with dbg_sel(3 downto 0) select dbg_lo <=
 with dbg_sel(3 downto 0) select dbg_hi <=
 	'0' & pc(5 downto 3) 	when X"F",	-- PC: location as octal
 	ir_current(7 downto 4) 	when X"E",
-	"000" & ir_lbx 			when X"D",
+	X"0"				 			when X"D",
 	X"0"							when X"C",
 	X"0"							when X"B",
 	X"0"			 				when X"A",

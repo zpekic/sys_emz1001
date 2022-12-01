@@ -17,11 +17,6 @@ package emz1001_package is
 constant char_zero: std_logic_vector(7 downto 0) := X"00";
 constant char_lf: std_logic_vector(7 downto 0) := X"0A";
 constant char_cr: std_logic_vector(7 downto 0) := X"0D";
---constant char_e: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('E')), 8));
---constant char_i: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('I')), 8));
---constant char_r: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('R')), 8));
---constant char_equ: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos('=')), 8));
---constant char_space: std_logic_vector(7 downto 0) := std_logic_vector(to_unsigned(natural(character'pos(' ')), 8));
 
 impure function c(char: in character) return std_logic_vector;
 impure function i(char: in character) return std_logic_vector;
@@ -29,7 +24,7 @@ impure function i(char: in character) return std_logic_vector;
 type mem1k8 is array(0 to 1023) of std_logic_vector(7 downto 0);
 type mem2k8 is array(0 to 2047) of std_logic_vector(7 downto 0);
 type mem256x8 is array(0 to 255) of std_logic_vector(7 downto 0);
-type mem64x13 is array(0 to 63) of std_logic_vector(12 downto 0);
+type mem64x12 is array(0 to 63) of std_logic_vector(11 downto 0);
 type mem4x10 is array(0 to 3) of std_logic_vector(9 downto 0);
 type mem4x14 is array(0 to 3) of std_logic_vector(13 downto 0);
 
