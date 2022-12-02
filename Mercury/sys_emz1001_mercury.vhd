@@ -212,9 +212,9 @@ constant mask: mem256x8 := (
 --	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i('='),i(' '),i(' '),i(' '),i(' '),X"03" , X"02",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('E'),i('M'),i('Z'),i('1'),i('0'),i('0'),i('1'),i('A'),
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i('T'),X"11",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('H'),i('o'),i('u'),i('t'),i(' '),X"01", X"01",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('L'),i('o'),i('u'),i('t'),i(' '),X"01", X"01",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i('o'),i('u'),i('t'),i(' '),i(' '),X"01", X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('H'),i('o'),i('u'),i('t'),i(' '),X"07", X"06",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('L'),i('o'),i('u'),i('t'),i(' '),X"05", X"04",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i('o'),i('u'),i('t'),i(' '),i(' '),X"03", X"02",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('R'),i('u'),i('/'),i('S'),i('k'),i(' '),X"01", X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('F'),i('2'),i('/'),i('F'),i('1'),i(' '),X"01", X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('C'),i('a'),i('r'),i('r'),i('y'),i(' '),i(' '),X"01",
@@ -284,13 +284,14 @@ signal mask_index: std_logic_vector(7 downto 0);
 signal win_mask, win_char: std_logic_vector(7 downto 0);
 signal win_hex: std_logic_vector(3 downto 0);
 
--- EMZ1001A debug
-signal dbg_sel: std_logic_vector(5 downto 0);
-signal dbg_mem, dbg_reg: std_logic_vector(3 downto 0); 
+-- EMZ1001A bus
 signal A: std_logic_vector(12 downto 0);
 signal D: std_logic_vector(7 downto 0);
 signal emz_i: std_logic_vector(3 downto 0);
-
+signal emz_nExt: std_logic;
+-- EMZ1001A debug
+signal dbg_sel: std_logic_vector(5 downto 0);
+signal dbg_mem, dbg_reg: std_logic_vector(3 downto 0); 
  
 -- other
 signal dbg_tty: std_logic_vector(31 downto 0);
@@ -314,7 +315,7 @@ mc: EMZ1001A Port map (
 			I => emz_i,
 --			I(3) => freq50Hz,	-- simulate 50Hz European mains frequency
 --			I(2 downto 0) => "000",
-			nEXTERNAL => open,
+			nEXTERNAL => emz_nExt,
 			SYNC => open,
 			STATUS => open,
 			A => A,
@@ -326,10 +327,6 @@ mc: EMZ1001A Port map (
 		);
 
 emz_i <= freq50Hz & switch(2 downto 0);
-
---DOT <= D(7);
---A_TO_G <= D(6 downto 0);
---AN(3 downto 0) <= A(3 downto 0);
 
 -- generate various frequencies
 clocks: clockgen Port map ( 
@@ -369,8 +366,8 @@ video: ttyvgawin port map (
 		win_color => switch(7), -- TODO, drive from window data
 		win_char(7) => win_mask(7),
 		win_char(6 downto 0) => win_char(6 downto 0),
-		tty_send => tx_send,
-		tty_char => tx_char,
+		tty_send => (emz_nExt), --tx_send,
+		tty_char => D, --tx_char,
 		tty_sent => open,
 		debug => dbg_tty
 	  );
@@ -427,10 +424,14 @@ uart_tx: uart_par2ser Port map (
 		);		
 		
 -- LEDs
-LED(0) <= cpu_clk;
+LED(0) <= emz_nExt; --cpu_clk;
 LED(1) <= PMOD_TXD;
 --LED(2) <= PMOD_RXD;
 --LED(3) <= rx_ready;
+	
+DOT <= D(7) when (switch(7) = '1') else '0';
+A_TO_G <= D(6 downto 0) when (switch(7) = '1') else "0000000";
+AN <= A(3 downto 0) when (switch(7) = '1') else "0000";
 	
 -- 7seg LED debug
 --sevenseg: fourdigitsevensegled Port map (

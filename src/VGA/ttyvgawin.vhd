@@ -142,7 +142,7 @@ mem_col <= std_logic_vector(unsigned(vga_cell(7 downto 0)) - 8);
 mem <= not (mem_row(7) or mem_row(6) or mem_row(5) or mem_col(7) or mem_col(6));
 
 -- give VGA either vram content (if in 64*16 window), or a space
-mem_char <= vram_dout when (mem = '1') else X"FF";
+mem_char <= vram_dout when (mem = '1') else (X"0" & vga_cell(9 downto 8) & vga_cell(1 downto 0));
 
 -- cursor is active if VGA row, col coincide with TTY ones
 cur_x <= '1' when (mem_col = tty_cell(7 downto 0)) else '0';

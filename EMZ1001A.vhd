@@ -53,28 +53,7 @@ end EMZ1001A;
 architecture Behavioral of EMZ1001A is
 
 type mem64x4 is array(0 to 63) of std_logic_vector(3 downto 0);
-
 constant bank0: mem1k8 := firmware;
-
--- used for PSH (OR, non-inverted) and PSL (AND, inverted)
-constant psx_mask: mem16x16 := (
-	"0000000000000001",
-	"0000000000000010",
-	"0000000000000100",
-	"0000000000001000",
-	"0000000000010000",
-	"0000000000100000",
-	"0000000001000000",
-	"0000000010000000",
-	"0000000100000000",
-	"0000001000000000",
-	"0000010000000000",
-	"0000100000000000",
-	"0001000000000000",
-	"0010000000000000",
-	"0100000000000000",
-	"1111111111111111"	-- set (or clear) all bits
-);
 
 -- PLA constants
 constant skp_0: std_logic_vector(3 downto 0) := X"0";
@@ -136,7 +115,7 @@ constant opr_lbp: std_logic_vector(4 downto 0) := '1' & X"d";
 constant opr_lai: std_logic_vector(4 downto 0) := '1' & X"e";
 constant opr_spp: std_logic_vector(4 downto 0) := '1' & X"f";
 
--- PLA for instruction decode
+-- PLA for instruction decode, codes 0x00 .. 0x3F
 constant pla_00: mem64x12 := (
 skp_0 & alu_nop & opr_nop,	-- NOP
 skp_0 & alu_nop & opr_brk,	-- BRK
@@ -204,6 +183,9 @@ skp_0 & alu_nop & opr_lam,	-- LAM
 skp_0 & alu_nop & opr_lam 	-- LAM
 );
 
+
+
+-- PLA for instruction decode, codes 0x40 .. 0x7F
 constant pla_01: mem64x12 := (
 skp_0 & alu_nop & opr_lbz,	-- LBZ
 skp_0 & alu_nop & opr_lbz,	-- LBZ
@@ -270,6 +252,26 @@ skp_0 & alu_nop & opr_lai,	-- LAI
 skp_0 & alu_nop & opr_lai,	-- LAI
 skp_0 & alu_nop & opr_lai	-- LAI
 ); 
+
+-- used for PSH (OR, non-inverted) and PSL (AND, inverted)
+constant psx_mask: mem16x16 := (
+	"0000000000000001",
+	"0000000000000010",
+	"0000000000000100",
+	"0000000000001000",
+	"0000000000010000",
+	"0000000000100000",
+	"0000000001000000",
+	"0000000010000000",
+	"0000000100000000",
+	"0000001000000000",
+	"0000010000000000",
+	"0000100000000000",
+	"0001000000000000",
+	"0010000000000000",
+	"0100000000000000",
+	"1111111111111111"	-- set (or clear) all bits
+);
 
 -- seven segment pattern for DISN instruction
 constant sevseg: mem16x8 := (
@@ -370,7 +372,7 @@ signal out_exe: std_logic;
 signal bu_xor: std_logic_vector(1 downto 0);
 
 alias i_clk: std_logic is I(3);	-- assume I3 is hooked up to 50/60Hz mains frequency
-signal sec: std_logic;	-- set when 1 second expires
+signal sec: std_logic:= '1';	-- set when 1 second expires
 
 signal psx: std_logic_vector(15 downto 0);
 signal eur: std_logic_vector(13 downto 0);	-- combines mains counter limit with xor mask
@@ -403,12 +405,12 @@ STATUS <= (t1 and (not mr_d_driven)) or (t3 and bl_is_13) or (t5 and mr_cy) or (
 
 -- nEXT goes low when executing OUT during T7
 nEXTERNAL <= not(t7 and out_exe); 
-out_exe <= (ir_run and (not ir_skp)) when (opr = opr_out) else '0';
+out_exe <= ir_run when (opr = opr_out) else '0';
 
 -- D is either floating, or driven from internal dout
-D <= dout when (mr_d_driven = '1') else "ZZZZZZZZ";
+D <= dout; -- when (mr_d_driven = '1') else "ZZZZZZZZ";
 -- internal dout is RAM & A when execution OUT instruction, or output latch otherwise
-dout <= (ram & mr_a) when ((out_exe and (t5 or t7)) = '1') else ir_dout;
+dout <= (ram & mr_a) when (out_exe = '1') else ir_dout;
 
 -- A is either program address of output latch
 A <= (ir_bank & pc) when ((mr_a_multiplexed and (t1 or t3)) = '1') else ir_slave;

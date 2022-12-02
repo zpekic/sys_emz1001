@@ -24,7 +24,7 @@ LF:			.alias 0xA;
 			//val6 = (5 + (7 / 2)) * 3;
 			//val6 = -!(0o7 ^ (7 % 3));
 			
-			LAI 0b1001;		// bit3 = 50Hz, bit0 = invert D lines on output
+			LAI 0b1000;		// bit3 = 50Hz, bit0 = invert D lines on output
 			EUR;			// set prescaler and inverter
 			
 			LBZ 0;			// select RAM column 0, row 0
@@ -40,7 +40,7 @@ ADDLOOP:	JMS  BCDADD;	// RAM[2,*] = RAM[1,*] + RAM[2,*]
 			PP 14;			// prepare for page 14 (instead of usual 15)
 			JMS  DISP_TTY;	// display to "teletype" (ASCII sequence output)
 
-DISPLOOP:	JMS  DISP_LED;	// display to 7-seg LEDs 
+DISPLOOP:	NOP; //JMS  DISP_LED;	// display to 7-seg LEDs 
 			SOS;			// check if 1 second lapsed
 			JMP DISPLOOP;	// no, continue refreshing LEDs as fast as possible
 			
@@ -63,9 +63,12 @@ DISP_TTY:	LBF 0b10;		// select current Fibonacci number column (2), BL = 15
 TTYLOOP:	LAI 3;			// ASCII digits 0..9 are hex 0x30 to 0x39
 			XC 0;			// keep BU, M.A is now 3.x
 			OUT;			// D pins <= 3X, strobe EXT low
-			XC 0;			// flip back
 			XCD	0b00;		// next, do not change column
-			JMP LEDLOOP;	
+			JMP TTYLOOP;
+			RSM 3;
+			RSM 2;
+			RSM 1;
+			RSM 0;			// clear M[BU, BL]
 			LAI CR;			// BL is 15, which is assumed to be 0
 			OUT;
 			LAI LF;		
@@ -88,7 +91,7 @@ SHIFT0LOOP:	LAM 0b01;		// A = M[1, BL], BU = 0 (LSB flipped)
 			
 SHIFT1:		LBZ 0b10;		// start with column 2
 SHIFT1LOOP:	LAM 0b11;		// switch to column 1 (both bits flipped!)
-			XCI 0b10;		// switch back to column 2		
+			XCI 0b11;		// switch back to column 2		
 			JMP SHIFT1LOOP;
 			RT;
 
@@ -117,8 +120,8 @@ BCDADD:		LBZ 0;			// BL = 0, BU = 0
 			RSC;			// clear carry
 ALOOP:		LAM 0b01;		// A = M[0, BL], BU = 1
 			ADCS;			// C,A = A + M[1, BU] + C
-			NOP;			// don't care about carry out here
-			JMS  DAA;		// decimal adjust accumulator
+			JMS V16_TO_18;	// carry set
+			JMS V0_TO_15;	// carry not set
 			XAE;			// save A in E
 			LAI 2;			// A = 2
 			XABU;			// BU = 2
@@ -126,18 +129,15 @@ ALOOP:		LAM 0b01;		// A = M[0, BL], BU = 1
 			XCI 0b10;		// M[2, BL] = A, BU = 0
 			JMP ALOOP;		// repeat until all 16 digits
 			RT;				// done
-			
-DAA:		SZC;
-			JMP V16_TO_18;	// if carry is set, we know it was 0x10 or above
-			ADIS 6;			// attempt a correction
-			JMP V0_TO_9;	// result was < 0x10, means no correction was needed
-			JMP ADJUSTED;
-			
-V0_TO_9:	ADIS 10;	// 6 + 10 = 16, meaning effectively adding "0"
-UNADJUSTED:	RSC;		// decimal carry forward
+
+V0_TO_15:	XAE;
+			LAE;			// E = A
+			ADIS 6;			// Classic DAA adjust
+			RT;				// carry set, adjustment was needed, A is correct BCD
+			XAE;			// carry not set, adjustment was not needed, restore A
 			RT;
 			
-V16_TO_18:	ADIS 6;		// 0x12 becomes 0x18 etc., carry remains set
-ADJUSTED:	STC;		// decimal carry forward
-			RT;
+V16_TO_18:	ADIS 5;		// 0x12 + 5 + 1 becomes 0x18 etc., carry remains set
+			STC;		// decimal carry forward
+			RTS;		// skip next
 						
