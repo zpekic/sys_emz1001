@@ -212,16 +212,16 @@ constant mask: mem256x8 := (
 --	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i('='),i(' '),i(' '),i(' '),i(' '),X"03" , X"02",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('E'),i('M'),i('Z'),i('1'),i('0'),i('0'),i('1'),i('A'),
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i('T'),X"11",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('H'),i('o'),i('u'),i('t'),i(' '),X"07", X"06",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('L'),i('o'),i('u'),i('t'),i(' '),X"05", X"04",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i('o'),i('u'),i('t'),i(' '),i(' '),X"03", X"02",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('R'),i('u'),i('/'),i('S'),i('k'),i(' '),X"01", X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('H'),i('i'),i(' '),i(' '),i(' '),X"07", X"06",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('L'),i('o'),i(' '),i(' '),i(' '),X"05", X"04",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i(' '),i(' '),i(' '),i(' '),i(' '),X"03", X"02",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('R'),i('u'),i('n'),i('S'),i('k'),i('p'),X"01", X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('F'),i('2'),i('/'),i('F'),i('1'),i(' '),X"01", X"01",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('C'),i('a'),i('r'),i('r'),i('y'),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('C'),i('Y'),i('/'),i('S'),i('E'),i('C'),X"01", X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('E'),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('B'),i('U'),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('B'),i('L'),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('P'),i('S'),i('H'),i('i'),i(' '),i(' '),X"01", X"01",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('B'),i('U'),i('/'),i('B'),i('L'),i(' '),X"01" ,X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('R'),i('A'),i('M'),i(' '),i(' '),i(' '),i(' '),X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('S'),i('P'),i(' '),i(' '),i(' '),i(' '),i(' '),X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('I'),i('c'),i('u'),i('r'),i('r'),i(' '),X"01", X"01",
@@ -366,10 +366,10 @@ video: ttyvgawin port map (
 		win_color => switch(7), -- TODO, drive from window data
 		win_char(7) => win_mask(7),
 		win_char(6 downto 0) => win_char(6 downto 0),
-		tty_send => (emz_nExt), --tx_send,
-		tty_char => D, --tx_char,
+		tty_send => tx_send,
+		tty_char => tx_char,
 		tty_sent => open,
-		debug => dbg_tty
+		debug => open --dbg_tty
 	  );
 
 -- show 16*16 window with top, left at screen center
@@ -387,7 +387,7 @@ with win_mask(6 downto 4) select win_char <=
 	lookup1(to_integer(unsigned(win_hex))) when "001",		-- special
 	win_mask when others;
 
--- select data for display
+-- select data for display (0 and 1 come internally from EMZ, 2 - F are external)
 with win_mask(3 downto 0) select win_hex <=
 	dbg_mem when X"0",
 	dbg_reg when X"1",
@@ -400,18 +400,18 @@ with win_mask(3 downto 0) select win_hex <=
 	X"F" when others;
 
 -- simple loopback
-uart_rx: uart_ser2par Port map ( 
-		reset => RESET, 
-		rxd_clk => baudrate_x4,
-		mode => "000",	-- 8N1
-		char => rx_char,
-		ready => rx_ready,
-		valid => open,
-		rxd => PMOD_TXD
-		);
-		
-tx_char <= rx_char;
-tx_send <= rx_ready;
+--uart_rx: uart_ser2par Port map ( 
+--		reset => RESET, 
+--		rxd_clk => baudrate_x4,
+--		mode => "000",	-- 8N1
+--		char => rx_char,
+--		ready => rx_ready,
+--		valid => open,
+--		rxd => PMOD_TXD
+--		);
+
+tx_char <= D; --rx_char;
+tx_send <= not (emz_nExt); --rx_ready;
 		
 uart_tx: uart_par2ser Port map (
 		reset => RESET,

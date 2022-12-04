@@ -161,22 +161,6 @@ chargen: chargen_rom port map (
 		h => h(2 downto 0),
 		pixel => pixel
 	);
-
---chargen_mem: chargen_rom port map (
---		a(10) => reverse,								-- invert the pattern based on cursor / char code 128-255
---		a(9 downto 3) => mem_char(6 downto 0),	-- 128 chars
---		a(2 downto 0) => v(2 downto 0),			-- 8 rows per char
---		h => h(2 downto 0),
---		pixel => pixel_mem
---	);
---
---chargen_win: chargen_rom port map (
---		a(10) => win_char(7),						-- invert the pattern based char code 128-255
---		a(9 downto 3) => win_char(6 downto 0),	-- 128 chars
---		a(2 downto 0) => v(2 downto 0),			-- 8 rows per char
---		h => h(2 downto 0),
---		pixel => pixel_win
---	);
 	
 color <= palette(to_integer(unsigned(color_index)));
 

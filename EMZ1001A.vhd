@@ -52,7 +52,7 @@ end EMZ1001A;
 
 architecture Behavioral of EMZ1001A is
 
-type mem64x4 is array(0 to 63) of std_logic_vector(3 downto 0);
+-- function defined in the package pulls in the content of internal 1k ROM
 constant bank0: mem1k8 := firmware;
 
 -- PLA constants
@@ -336,6 +336,8 @@ signal ir_mask: std_logic_vector(3 downto 0); -- inverted before loading!
 signal ir_bank: std_logic_vector(2 downto 0); -- one of 8 1k banks
 
 signal ir_eur:	std_logic_vector(1 downto 0);		-- middle 2-bits from A are ignored
+signal ir_sec: std_logic:= '1';	-- set when 1 second expires
+signal ir_cnt: std_logic_vector(5 downto 0);		-- counts to 50 or 60, so 6 bits are enough
 
 -- program control
 signal ir_stack : mem4x10;
@@ -368,11 +370,10 @@ signal bl_is_e, a_is_m, bl_is_0, bl_is_f, bit_is_1, bl_is_13: std_logic;
 signal ik: std_logic_vector(3 downto 0);
 signal disn_out, disb_out, dout: std_logic_vector(7 downto 0);
 signal skp_mask, mask8: std_logic_vector(7 downto 0);
-signal out_exe: std_logic;
+signal out_exe, sos_clr: std_logic;
 signal bu_xor: std_logic_vector(1 downto 0);
 
 alias i_clk: std_logic is I(3);	-- assume I3 is hooked up to 50/60Hz mains frequency
-signal sec: std_logic:= '1';	-- set when 1 second expires
 
 signal psx: std_logic_vector(15 downto 0);
 signal eur: std_logic_vector(13 downto 0);	-- combines mains counter limit with xor mask
@@ -382,6 +383,9 @@ alias eur_limit: std_logic_vector(5 downto 0) is eur(13 downto 8);	-- to count t
 signal bl_incdec: std_logic_vector(7 downto 0);
 alias bl_inc: std_logic_vector(3 downto 0) is bl_incdec(7 downto 4); -- 16 values, 4 bits
 alias bl_dec: std_logic_vector(3 downto 0) is bl_incdec(3 downto 0);
+
+signal e_incdec: std_logic_vector(7 downto 0);
+alias e_inc: std_logic_vector(3 downto 0) is e_incdec(7 downto 4);
 
 signal sp_incdec: std_logic_vector(3 downto 0);
 alias sp_inc: std_logic_vector(1 downto 0) is sp_incdec(3 downto 2);	-- 4 values, 2 bits
@@ -418,8 +422,37 @@ A <= (ir_bank & pc) when ((mr_a_multiplexed and (t1 or t3)) = '1') else ir_slave
 -- constant values set by EUR
 eur <= eur_lookup(to_integer(unsigned(ir_eur)));
 
+-- 1 second timer logic
+sos_clr <= (ir_run and ir_sec and t7) when (opr = opr_sos) else '0';
+
+on_i_clk: process(nPOR, i_clk, sos_clr)
+begin
+	if ((nPOR = '0') or (sos_clr = '1')) then
+		ir_sec <= '0';
+		if (nPOR = '0') then
+			ir_cnt <= (others => '0');
+		end if;
+	else
+		if (rising_edge(i_clk)) then
+			if (ir_cnt = eur_limit) then	-- if 50 or 60 reached
+				ir_cnt <= (others => '0');	-- reset counter
+				ir_sec <= '1';					-- set 1 second flag
+			else
+				ir_cnt <= std_logic_vector(unsigned(ir_cnt) + 1);
+			end if;
+		end if;
+	end if;
+end process;
+
 -- prepare mask for PSL/PSH
 psx <= psx_mask(to_integer(unsigned(mr_bl)));
+
+-- mask for STM (upper nibble) and RSM (lower nibble) 
+with ir_current(1 downto 0) select mask8 <=
+	"00011110" when "00",
+	"00101101" when "01",
+	"01001011" when "10",
+	"10000111" when others;
 
 -- when skip flag is set, force a NOP to be loaded into instruction register
 skp_mask <= X"00" when (ir_skp = '1') else X"FF";
@@ -430,6 +463,7 @@ disb_out <= eur_invert xor (ram & mr_a);																-- combine RAM and A
 
 -- save a few adders
 bl_incdec <= incdec(to_integer(unsigned(mr_bl)));
+e_incdec <= incdec(to_integer(unsigned(mr_e)));
 
 with ir_sp select sp_incdec <=
 	"0111" when "00",
@@ -469,7 +503,7 @@ with alu select y_alu <=
 with skp select y_skp <=
 		'0' 	when skp_0,	-- never skip next instruction
 		'1' 	when skp_1,	-- always skip next instruction
-		sec 	when skp_sec,
+		ir_sec  when skp_sec,
 		bl_is_e when skp_ble,
 		(not mr_cy) when skp_cy0,
 		(not y_alu(5)) when skp_cout,
@@ -490,18 +524,14 @@ bl_is_13 <= psx(13);
 bl_is_f <= psx(15);
 a_is_m <= '1' when (mr_a = ram) else '0';
 
+-- SZM
 with ir_current(1 downto 0) select bit_is_1 <=
 	ram(0) when "00",
 	ram(1) when "01",
 	ram(2) when "10",
 	ram(3) when others;
 
-with ir_current(1 downto 0) select mask8 <=
-	"00011110" when "00",
-	"00101101" when "01",
-	"01001011" when "10",
-	"10000111" when others;
-
+-- SZK and SZI 
 with ir_current(0) select ik <= 
 	(ir_k or ir_mask) when '0', 		-- SZK 0x28
 	(ir_i or ir_mask) when others; 	-- SZI 0x29
@@ -548,181 +578,177 @@ begin
 				-- update skip flag based on the currectly executed instruction
 					ir_skp <= y_skp; 
 				-- T5: execution of most instructions happens here (if not skipped)
-				--	if (ir_skp = '0') then
-						case opr is
-							when opr_lai =>
-								ir_lbx <= '0';
-								if (ir_lai = '0') then	-- only execute if previous was not LAI
-									mr_a <= ir_current(3 downto 0);
-									ir_mask <= ir_current(3 downto 0);
-									ir_lai <= '1';
-								end if;
-							when opr_lbf =>	-- LBF
-								ir_lai <= '0';
-								if (ir_lbx = '0') then	-- only execute if previous was not 
-									mr_bl <= X"F";
-									mr_bu <= ir_current(1 downto 0);
-									ir_lbx <= '1';
-								end if;
-							when opr_lbe =>	-- LBE
-								ir_lai <= '0';
-								if (ir_lbx = '0') then	-- only execute if previous was not 
-									mr_bl <= mr_e;
-									mr_bu <= ir_current(1 downto 0);
-									ir_lbx <= '1';
-								end if;
-							when opr_lbz =>	-- LBZ
-								ir_lai <= '0';
-								if (ir_lbx = '0') then	-- only execute if previous was not 
-									mr_bl <= X"0";
-									mr_bu <= ir_current(1 downto 0);
-									ir_lbx <= '1';
-								end if;
-							when opr_lbp =>	-- LBEP
-								ir_lai <= '0';
-								if (ir_lbx = '0') then	-- only execute if previous was not 
-									mr_bl <= std_logic_vector(unsigned(mr_e) + 1);
-									mr_bu <= ir_current(1 downto 0);
-									ir_lbx <= '1';
-								end if;
-							when others =>
-								-- reset LAI and LBX flags for all other instructions
-								ir_lai <= '0';
-								ir_lbx <= '0';
-								case opr is
-									when opr_nop =>	-- NOP
-										null;
-									when opr_brk =>	-- BRK
-										null; -- TODO: implement breakpoint!
-									when opr_ret =>	-- RT, RTS
-										null; -- Stack decrement happens at T7
-									when opr_sos =>	-- SOS
-										null; -- TODO;
-									when opr_psx =>	-- PSH, PSL
-										if (ir_current(0) = '0') then
-											mr_master <= mr_master or psx; -- PSH
-										else
-											mr_master <= mr_master and (psx xor X"FFFF"); -- PSL
-										end if;
-									when opr_alu =>	-- ADD, ADCS, ADIS, AND, XOR, CMA, STC, RSC 
-										mr_cy <= y_alu(5); 
-										mr_a <= y_alu(4 downto 1);
-									when opr_xae =>	-- XAE
-										mr_e <= mr_a;	
-										mr_a <= mr_e;
-									when opr_lae =>	-- LAE
-										mr_a <= mr_e;
-									when opr_lab =>	-- LAB
-										mr_a <= mr_bl;
-									when opr_inp =>	-- INP
-										mr_ram(to_integer(unsigned(ram_addr))) <= D(7 downto 4);
-										mr_a <= D(3 downto 0);
-									when opr_eur =>	-- EUR
-										ir_eur <= mr_a(3) & mr_a(0); -- middle 2 bits are ignored
-									when opr_dsb =>	-- DISB
-										ir_dout <= disb_out;	-- update output latch
-									when opr_dsn =>	-- DISN
-										ir_dout <= disn_out;	-- update output latch
-									when opr_out =>	-- OUT
-										null;				-- no register changes, D is just driven from RAM & A during T5, T7
-									when opr_xab =>	-- XAB
-										mr_bl <= mr_a;	
-										mr_a <= mr_bl;
-									when opr_jms =>	-- JMS
-										ir_sp <= sp_inc; -- prepare for new stack level
-									when opr_jmp =>	-- JMP
-										null;				-- handled during T7
-									when opr_sfx =>	-- SF1, RF1, SF2, RF2
-										if (ir_current(1) = '1') then
-											mr_f1 <= ir_current(0);
-										else
-											mr_f2 <= ir_current(0);
-										end if;
-									when opr_xc0 =>	-- XC
-										mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
-										mr_a <= ram;
-										mr_bu <= bu_xor;
-									when opr_xci =>	-- XCI
-										mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
-										mr_a <= ram;
-										mr_bu <= bu_xor;
-										mr_bl <= bl_inc;
-									when opr_xcd =>	-- XCD
-										mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
-										mr_a <= ram;
-										mr_bu <= bu_xor;
-										mr_bl <= bl_dec;
-									when opr_lam =>	-- LAM
-										mr_a <= ram;
-										mr_bu <= bu_xor;
-									when opr_xbu =>	-- XABU
-										mr_bu <= mr_a(1 downto 0);
-										mr_a(1 downto 0) <= mr_bu;
-									when opr_mvs =>	-- MVS
-										ir_slave <= mr_master(12 downto 0);
-									when opr_stm =>	-- STM
-										mr_ram(to_integer(unsigned(ram_addr))) <= ram or mask8(7 downto 4);
-									when opr_rsm =>	-- RSM
-										mr_ram(to_integer(unsigned(ram_addr))) <= ram and mask8(3 downto 0);
-									when opr_spp =>	-- PP
-										case ir_pp is
-											when "00" =>
-												ir_newpage <= ir_current(3 downto 0) xor X"F";
-												ir_pp <= "01";
-											when "01" =>
-												ir_newbank <= ir_current(3 downto 0) xor X"F";
-												ir_pp <= "10";
-											when others =>
-												-- subsequent PP instructions just change the bank
-												ir_newbank <= ir_current(3 downto 0) xor X"F";						
-										end case;
-									when others =>
-										null; -- TODO: possibly HCF? (Halt and catch fire)
-								end case;
+					case opr is
+						when opr_lai =>
+							ir_lbx <= '0';
+							if (ir_lai = '0') then	-- only execute if previous was not LAI
+								mr_a <= ir_current(3 downto 0);
+								ir_mask <= ir_current(3 downto 0);
+								ir_lai <= '1';
+							end if;
+						when opr_lbf =>	-- LBF
+							ir_lai <= '0';
+							if (ir_lbx = '0') then	-- only execute if previous was not 
+								mr_bl <= X"F";
+								mr_bu <= ir_current(1 downto 0);
+								ir_lbx <= '1';
+							end if;
+						when opr_lbe =>	-- LBE
+							ir_lai <= '0';
+							if (ir_lbx = '0') then	-- only execute if previous was not 
+								mr_bl <= mr_e;
+								mr_bu <= ir_current(1 downto 0);
+								ir_lbx <= '1';
+							end if;
+						when opr_lbz =>	-- LBZ
+							ir_lai <= '0';
+							if (ir_lbx = '0') then	-- only execute if previous was not 
+								mr_bl <= X"0";
+								mr_bu <= ir_current(1 downto 0);
+								ir_lbx <= '1';
+							end if;
+						when opr_lbp =>	-- LBEP
+							ir_lai <= '0';
+							if (ir_lbx = '0') then	-- only execute if previous was not 
+								mr_bl <= e_inc;
+								mr_bu <= ir_current(1 downto 0);
+								ir_lbx <= '1';
+							end if;
+						when others =>
+							-- reset LAI and LBX flags for all other instructions
+							ir_lai <= '0';
+							ir_lbx <= '0';
+							case opr is
+								when opr_nop =>	-- NOP
+									null;
+								when opr_brk =>	-- BRK
+									null; -- TODO: implement breakpoint!
+								when opr_ret =>	-- RT, RTS
+									null; -- Stack decrement happens at T7
+								when opr_sos =>	-- SOS
+									null; -- implemented through "sos_clr" signal;
+								when opr_psx =>	-- PSH, PSL
+									if (ir_current(0) = '0') then
+										mr_master <= mr_master or psx; -- PSH
+									else
+										mr_master <= mr_master and (psx xor X"FFFF"); -- PSL
+									end if;
+								when opr_alu =>	-- ADD, ADCS, ADIS, AND, XOR, CMA, STC, RSC 
+									mr_cy <= y_alu(5); 
+									mr_a <= y_alu(4 downto 1);
+								when opr_xae =>	-- XAE
+									mr_e <= mr_a;	
+									mr_a <= mr_e;
+								when opr_lae =>	-- LAE
+									mr_a <= mr_e;
+								when opr_lab =>	-- LAB
+									mr_a <= mr_bl;
+								when opr_inp =>	-- INP
+									mr_ram(to_integer(unsigned(ram_addr))) <= D(7 downto 4);
+									mr_a <= D(3 downto 0);
+								when opr_eur =>	-- EUR
+									ir_eur <= mr_a(3) & mr_a(0); -- middle 2 bits are ignored
+								when opr_dsb =>	-- DISB
+									ir_dout <= disb_out;	-- update output latch
+								when opr_dsn =>	-- DISN
+									ir_dout <= disn_out;	-- update output latch
+								when opr_out =>	-- OUT
+									null;				-- no register changes, D is just driven from RAM & A during T5, T7
+								when opr_xab =>	-- XAB
+									mr_bl <= mr_a;	
+									mr_a <= mr_bl;
+								when opr_jms =>	-- JMS
+									ir_sp <= sp_inc; -- prepare for new stack level
+								when opr_jmp =>	-- JMP
+									null;				-- handled during T7
+								when opr_sfx =>	-- SF1, RF1, SF2, RF2
+									if (ir_current(1) = '1') then
+										mr_f1 <= ir_current(0);
+									else
+										mr_f2 <= ir_current(0);
+									end if;
+								when opr_xc0 =>	-- XC
+									mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
+									mr_a <= ram;
+									mr_bu <= bu_xor;
+								when opr_xci =>	-- XCI
+									mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
+									mr_a <= ram;
+									mr_bu <= bu_xor;
+									mr_bl <= bl_inc;
+								when opr_xcd =>	-- XCD
+									mr_ram(to_integer(unsigned(ram_addr))) <= mr_a;
+									mr_a <= ram;
+									mr_bu <= bu_xor;
+									mr_bl <= bl_dec;
+								when opr_lam =>	-- LAM
+									mr_a <= ram;
+									mr_bu <= bu_xor;
+								when opr_xbu =>	-- XABU
+									mr_bu <= mr_a(1 downto 0);
+									mr_a(1 downto 0) <= mr_bu;
+								when opr_mvs =>	-- MVS
+									ir_slave <= mr_master(12 downto 0);
+								when opr_stm =>	-- STM
+									mr_ram(to_integer(unsigned(ram_addr))) <= ram or mask8(7 downto 4);
+								when opr_rsm =>	-- RSM
+									mr_ram(to_integer(unsigned(ram_addr))) <= ram and mask8(3 downto 0);
+								when opr_spp =>	-- PP
+									case ir_pp is
+										when "00" =>
+											ir_newpage <= ir_current(3 downto 0) xor X"F";
+											ir_pp <= "01";
+										when "01" =>
+											ir_newbank <= ir_current(3 downto 0) xor X"F";
+											ir_pp <= "10";
+										when others =>
+											-- subsequent PP instructions just change the bank
+											ir_newbank <= ir_current(3 downto 0) xor X"F";						
+									end case;
+								when others =>
+									null; -- TODO: possibly HCF? (Halt and catch fire)
+							end case;
 						end case;
-					--end if;
 				end if;
 				if (t7 = '1') then
 				-- T7: only JMP, JMS and RT/RTS are handled
-				--	if (ir_skp = '0') then
-						case opr is
-							when opr_jmp =>
-								case ir_pp is
-									when "00" =>	
-										-- no PP, jump to somewhere on same page
-										ir_stack(to_integer(unsigned(ir_sp))) <= page & ir_target; 
-									when "01" =>
-										-- single PP, jump to any page
-										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
-									when others =>
-										-- two PPs, jump to any bank/page/location
-										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
-										ir_bank <= ir_newbank(2 downto 0);
-								end case;
-								-- indicate that PPs were used
-								ir_pp <= "00";
-							when opr_jms =>
-								case ir_pp is
-									when "00" =>	
-										-- no PP, call to somewhere on page 15
-										ir_stack(to_integer(unsigned(ir_sp))) <= "1111" & ir_target; 
-									when "01" =>
-										-- single PP, call to any page
-										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
-									when others =>
-										-- two PPs, call to any bank/page/location
-										ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
-										ir_bank <= ir_newbank(2 downto 0);
-								end case;
-								-- indicate that PPs were used
-								ir_pp <= "00";
-							when opr_ret =>
-								-- previous stack level
-								ir_sp <= sp_dec;
-							when others =>
-								null;
-						end case;
-					--end if;
+					case opr is
+						when opr_jmp =>
+							case ir_pp is
+								when "00" =>	
+									-- no PP, jump to somewhere on same page
+									ir_stack(to_integer(unsigned(ir_sp))) <= page & ir_target; 
+								when "01" =>
+									-- single PP, jump to any page
+									ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+								when others =>
+									-- two PPs, jump to any bank/page/location
+									ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+									ir_bank <= ir_newbank(2 downto 0);
+							end case;
+							-- indicate that PPs were used
+							ir_pp <= "00";
+						when opr_jms =>
+							case ir_pp is
+								when "00" =>	
+									-- no PP, call to somewhere on page 15
+									ir_stack(to_integer(unsigned(ir_sp))) <= "1111" & ir_target; 
+								when "01" =>
+									-- single PP, call to any page
+									ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+								when others =>
+									-- two PPs, call to any bank/page/location
+									ir_stack(to_integer(unsigned(ir_sp))) <= ir_newpage & ir_target; 
+									ir_bank <= ir_newbank(2 downto 0);
+							end case;
+							-- indicate that PPs were used
+							ir_pp <= "00";
+						when opr_ret =>
+							-- previous stack level
+							ir_sp <= sp_dec;
+						when others =>
+							null;
+					end case;
 				end if;
 			end if;
 		end if;
@@ -762,11 +788,11 @@ dbg_mem <= mr_ram(to_integer(unsigned(dbg_sel)));
 -- 4	- 		-	 	D		D		--	D output buffer
 --	5	-  	-		RUN	SKP	-- RUN and SKIP flags
 -- 6	- 		-		F2		F1		-- F2 and F1 flags
--- 7	- 		-		0		CY		-- Carry flag
+-- 7	- 		-		CY		SEC	-- Carry flag / 1 sec flag
 -- 8	- 		-		0		E		-- E register
 -- 9	- 		-	 	0		A		-- Accumulator
---	A	- 		-		0		BU		-- RAM column
--- B	- 		-		0		BL		-- RAM row
+--	A	- 		-		PSX	PSX	-- Upper byte for PSH/PSL
+-- B	- 		-		BU		BL		-- RAM column / row
 -- C	- 		-		0		M		-- currently selected RAM
 -- D	-		-		0		sp		-- stack pointer
 -- E	- 		-		ir		ir		-- instruction register
@@ -785,10 +811,10 @@ with dbg_sel(3 downto 0) select dbg_lo <=
 	"00" & ir_sp	 			when X"D",
 	ram							when X"C",
 	mr_bl 						when X"B",
-	"00" & mr_bu 				when X"A",
+	mr_master(3 downto 0) 	when X"A",
 	mr_a 							when X"9",
 	mr_e 							when X"8",
-	"000" & mr_cy 				when X"7",
+	"000" & ir_sec 				when X"7",
 	"000" & mr_f1 				when X"6",
 	"000" & ir_skp 			when X"5",
 	ir_dout(3 downto 0) 		when X"4",
@@ -801,11 +827,11 @@ with dbg_sel(3 downto 0) select dbg_hi <=
 	ir_current(7 downto 4) 	when X"E",
 	X"0"				 			when X"D",
 	X"0"							when X"C",
-	X"0"							when X"B",
-	X"0"			 				when X"A",
+	"00" & mr_bu				when X"B",
+	mr_master(7 downto 4)	when X"A",
 	X"0" 							when X"9",
 	X"0" 							when X"8",
-	X"0"			 				when X"7",
+	"000" & mr_cy		 		when X"7",
 	"000" & mr_f2 				when X"6",
 	"000" & ir_run 			when X"5",
 	ir_dout(7 downto 4) 		when X"4",

@@ -21,16 +21,17 @@ constant char_cr: std_logic_vector(7 downto 0) := X"0D";
 impure function c(char: in character) return std_logic_vector;
 impure function i(char: in character) return std_logic_vector;
 
-type mem1k8 is array(0 to 1023) of std_logic_vector(7 downto 0);
 type mem2k8 is array(0 to 2047) of std_logic_vector(7 downto 0);
+type mem1k8 is array(0 to 1023) of std_logic_vector(7 downto 0);
 type mem256x8 is array(0 to 255) of std_logic_vector(7 downto 0);
 type mem64x12 is array(0 to 63) of std_logic_vector(11 downto 0);
-type mem4x10 is array(0 to 3) of std_logic_vector(9 downto 0);
+type mem64x4 is array(0 to 63) of std_logic_vector(3 downto 0);
+type mem16x8 is array(0 to 15) of std_logic_vector(7 downto 0);
 type mem4x14 is array(0 to 3) of std_logic_vector(13 downto 0);
+type mem4x10 is array(0 to 3) of std_logic_vector(9 downto 0);
 
 impure function firmware return mem1k8;
 
-type mem16x8 is array(0 to 15) of std_logic_vector(7 downto 0);
 constant hex2ascii: mem16x8 := (
 	c('0'),
 	c('1'),

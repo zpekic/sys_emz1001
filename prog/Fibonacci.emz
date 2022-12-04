@@ -18,16 +18,11 @@ LF:			.alias 0xA;
 //	Execution starts at bank 0, page 0, location 0
 //	---------------------------------------------------------------------------
 			NOP;
-			//val6 = -(-(-7 + 0xA));
-			//val6 = 0x3F & ((1 | (15 * 15)) - 256);
-			//val6 = (0b1010 | 0b0101) * 2;
-			//val6 = (5 + (7 / 2)) * 3;
-			//val6 = -!(0o7 ^ (7 % 3));
 			
 			LAI 0b1000;		// bit3 = 50Hz, bit0 = invert D lines on output
 			EUR;			// set prescaler and inverter
 			
-			LBZ 0;			// select RAM column 0, row 0
+DEADLOOP: 	LBZ 0;			// select RAM column 0, row 0
 			JMS  CLEAR;		// clear RAM column 0
 			
 			LBZ 1;			// select RAM column 1, row 0
@@ -35,12 +30,25 @@ LF:			.alias 0xA;
 			
 			LBZ 1;			// select digit 0 in RAM column 1
 			STM 0;			// RAM[1,0] = 1
+
+			LBF 0b10;		// select current Fibonacci number column (2), BL = 15
+			PSH;			// set all A lines high
+			MVS;			// all anodes high
+			XCD 0b00;		// BL = 14, keep BU
+			PSH;			// drive D lines, do not float them
+			XCD 0b00;		// BL = 13, keep BU
+			PSL;			// set static operation 
+			
+//			PP 13;			// HELLO WORLD!
+//			JMS GREETINGS;
 			
 ADDLOOP:	JMS  BCDADD;	// RAM[2,*] = RAM[1,*] + RAM[2,*]
+			SZC;			// check for overflow
+			JMP	DEADLOOP;	// carry from most significant digit means overflow, start from scratch 
 			PP 14;			// prepare for page 14 (instead of usual 15)
 			JMS  DISP_TTY;	// display to "teletype" (ASCII sequence output)
 
-DISPLOOP:	NOP; //JMS  DISP_LED;	// display to 7-seg LEDs 
+DISPLOOP:	JMS  DISP_LED;	// display to 7-seg LEDs 
 			SOS;			// check if 1 second lapsed
 			JMP DISPLOOP;	// no, continue refreshing LEDs as fast as possible
 			
@@ -50,31 +58,91 @@ DISPLOOP:	NOP; //JMS  DISP_LED;	// display to 7-seg LEDs
 			
 			JMP ADDLOOP;	// RAM[0,*] and RAM[1,*] contain last two Fibonacci numbers, continue
 
+//*
+			.org 0b1101000000;
+// Page 13 for hello world
+// ----------------------------------------------------------------------------
+GREETINGS:	LBZ 0b11;		// BU = 3, BL = 0 ("free column")
+			JMS CRLF;
+			JMS H;
+			JMS E;
+			JMS L;
+			JMS L;
+			JMS O;
+			JMS SPACE;
+			JMS W;
+			JMS O;
+			JMS R;
+			JMS L;
+			JMS D;
+			JMS EXCPOINT;
+			JMP CRLF;
+			
+H:			LAI 0x0F & 'H';
+			JMP OUT_4;
+E:			LAI 0x0F & 'E';
+			JMP OUT_4;
+L:			LAI 0x0F & 'L';
+			JMP OUT_4;
+O:			LAI 0x0F & 'O';
+			JMP OUT_4;
+SPACE:		LAI 0x0F & ' ';
+			JMP OUT_2;
+W:			LAI 0x0F & 'W';
+			JMP OUT_5;
+R:			LAI 0x0F & 'R';
+			JMP OUT_5;
+D:			LAI 0x0F & 'D';
+			JMP OUT_4;
+EXCPOINT:	LAI 0x0F & '!';
+OUT_2:		RSM 3;
+			RSM 2;
+			STM 1;
+OUT_xxx0:	RSM 0;
+			OUT;
+			RT;
+
+OUT_4:		RSM 3;
+			STM 2;
+			RSM 1;
+			JMP OUT_xxx0;
+
+OUT_5:		RSM 3;
+			STM 2;
+			RSM 1;
+			STM 0;
+			OUT;
+			RT;
+
+OUT_0:		RSM 3;
+			RSM 2;
+			RSM 1;
+			RSM 0;
+			RT;
+*//
+
 			.org 0b1110000000;
 //	Page 14 as an "overflow" from busy subroutine page 15
 // ----------------------------------------------------------------------------
-DISP_TTY:	LBF 0b10;		// select current Fibonacci number column (2), BL = 15
-			PSL;			// set all A lines low
-			XCD 0b00;		// BL = 14, keep BU
-			PSH;			// drive D lines, do not float them
-			XCD 0b00;		// BL = 13, keep BU
-			PSL;			// set static operation 
-			XCD 0b00;		// start displaying at digit 12 (9999999999999)
+DISP_TTY:	LAI 12;			// start displaying at digit 12 
+			XAE;			// 
+			LBE	0b10;		// BL = 12, BU = 2
 TTYLOOP:	LAI 3;			// ASCII digits 0..9 are hex 0x30 to 0x39
 			XC 0;			// keep BU, M.A is now 3.x
 			OUT;			// D pins <= 3X, strobe EXT low
 			XCD	0b00;		// next, do not change column
 			JMP TTYLOOP;
-			RSM 3;
+CRLF:		RSM 3;
 			RSM 2;
 			RSM 1;
-			RSM 0;			// clear M[BU, BL]
+			RSM 0;
 			LAI CR;			// BL is 15, which is assumed to be 0
 			OUT;
-			LAI LF;		
-			OUT;			// CR+LF sequence to go to next line
+			LAI LF;	
+			OUT;
 			RT;
 
+			
 			.org 0b1111000000;
 //	Page 15 in the bank is the default place for subroutines
 // ----------------------------------------------------------------------------
@@ -95,23 +163,20 @@ SHIFT1LOOP:	LAM 0b11;		// switch to column 1 (both bits flipped!)
 			JMP SHIFT1LOOP;
 			RT;
 
-DISP_LED:	LBF 0b10;		// select current Fibonacci number column (2), BL = 15
-			PSL;			// set all A lines low
-			XCD 0b00;		// BL = 14, keep BU
-			PSH;			// drive D lines, do not float them
-			XCD 0b00;		// BL = 13, keep BU
-			PSL;			// set static operation 
-			XCD 0b00;		// start displaying at digit 12 (9999999999999)
+DISP_LED:	LAI 12;			// start displaying at digit 12 
+			XAE;			// 
+			LBE	0b10;		// BL = 12, BU = 2
 			RSC;			// no decimal point displayed
-LEDLOOP:	LAM 0b00;		// A <= M[BL, BU]
-			PSH;			// prepare anode selected by [BL] high
-			MVS;			// update A pins (A[BL] <= '1')
-			DISN;			// Cathodes from A 7-seg decode
+LEDLOOP:	LAM 0b00;		// A <= M[BU, BL]
+			DISN;			// segment pattern to D outputs (inverted)
+			PSL;			// prepare digit low (on)
+			MVS;			// update A pins (A[BL] <= '0')
 			NOP;			// delay to keep it lit for a bit
 			NOP;
 			NOP;
-			PSL;			// anode off
-			MVS;			// update A pins (A[BL] <= '0')
+			NOP;
+			PSH;			// prepare digit high (off)
+			MVS;			// update A pins (A[BL] <= '1')
 			XCD	0b00;		// next, do not change column
 			JMP LEDLOOP;	
 			RT;
@@ -133,11 +198,14 @@ ALOOP:		LAM 0b01;		// A = M[0, BL], BU = 1
 V0_TO_15:	XAE;
 			LAE;			// E = A
 			ADIS 6;			// Classic DAA adjust
-			RT;				// carry set, adjustment was needed, A is correct BCD
+			JMP BCDCARRY;	// carry set, adjustment was needed, A is correct BCD
 			XAE;			// carry not set, adjustment was not needed, restore A
 			RT;
+BCDCARRY:   STC;
+			RT;
 			
-V16_TO_18:	ADIS 5;		// 0x12 + 5 + 1 becomes 0x18 etc., carry remains set
+V16_TO_18:	ADIS 6;		// 0x12 + 6 + 1 becomes 0x18 etc., carry remains set
+			NOP;
 			STC;		// decimal carry forward
 			RTS;		// skip next
 						
