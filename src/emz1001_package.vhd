@@ -11,6 +11,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use IEEE.NUMERIC_STD.ALL;
 use work.fibonacci_code.all;
+use work.helloworld_code.all;
 
 package emz1001_package is
 
@@ -30,7 +31,7 @@ type mem16x8 is array(0 to 15) of std_logic_vector(7 downto 0);
 type mem4x14 is array(0 to 3) of std_logic_vector(13 downto 0);
 type mem4x10 is array(0 to 3) of std_logic_vector(9 downto 0);
 
-impure function firmware return mem1k8;
+impure function firmware(sel: in integer) return mem1k8;
 
 constant hex2ascii: mem16x8 := (
 	c('0'),
@@ -130,13 +131,21 @@ begin
 	return X"80" xor c(char);
 end i;
 
-impure function firmware return mem1k8 is
+impure function firmware(sel: in integer) return mem1k8 is
 variable temp: mem1k8;
 begin
-	assert true report "FIRMWARE: start initializing" severity note;
-	for i in 0 to 1023 loop
-		temp(i) := emz_microcode(i);
-	end loop;
+	if (sel = 0) then
+		assert true report "FIRMWARE: start initializing (fibonacci example)" severity note;
+		for i in 0 to 1023 loop
+			temp(i) := fib_microcode(i);
+		end loop;
+	else
+		assert true report "FIRMWARE: start initializing (helloworld example)" severity note;
+		for i in 0 to 1023 loop
+			temp(i) := hlw_microcode(i);
+		end loop;
+	end if;
+	
 	assert true report "FIRMWARE: done initializing" severity note;
 
 	return temp;

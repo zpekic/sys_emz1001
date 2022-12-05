@@ -6,14 +6,15 @@
 // http://www.bitsavers.org/components/ami/s2000/
 // Full description: (TBD link to hackaday project)
 //---------------------------------------------------------------------------------------------
-			.code 10, 8, fibonacci_code.mif, fibonacci_code.cgf, fibonacci_code.coe, emz:fibonacci_code.vhd, fibonacci_code.hex, fibonacci_code.bin, 1;
-			.symbol 10, 256, fibonacci_sym.mif, fibonacci_sym.cgf, fibonacci_sym.coe, emz:fibonacci_sym.vhd, fibonacci_sym.hex, fibonacci_sym.bin, 32;
+			.code 10, 8, fibonacci_code.mif, fibonacci_code.cgf, fibonacci_code.coe, fib:fibonacci_code.vhd, fibonacci_code.hex, fibonacci_code.bin, 1;
+			.symbol 10, 256, fibonacci_sym.mif, fibonacci_sym.cgf, fibonacci_sym.coe, fib:fibonacci_sym.vhd, fibonacci_sym.hex, fibonacci_sym.bin, 32;
 
 #include "emz1001.mcc";
 
 CR:			.alias 0xD;
 LF:			.alias 0xA;
 
+//	---------------------------------------------------------------------------
 			.org 0;
 //	Execution starts at bank 0, page 0, location 0
 //	---------------------------------------------------------------------------
@@ -38,10 +39,7 @@ DEADLOOP: 	LBZ 0;			// select RAM column 0, row 0
 			PSH;			// drive D lines, do not float them
 			XCD 0b00;		// BL = 13, keep BU
 			PSL;			// set static operation 
-			
-//			PP 13;			// HELLO WORLD!
-//			JMS GREETINGS;
-			
+				
 ADDLOOP:	JMS  BCDADD;	// RAM[2,*] = RAM[1,*] + RAM[2,*]
 			SZC;			// check for overflow
 			JMP	DEADLOOP;	// carry from most significant digit means overflow, start from scratch 
@@ -58,72 +56,10 @@ DISPLOOP:	JMS  DISP_LED;	// display to 7-seg LEDs
 			
 			JMP ADDLOOP;	// RAM[0,*] and RAM[1,*] contain last two Fibonacci numbers, continue
 
-//*
-			.org 0b1101000000;
-// Page 13 for hello world
-// ----------------------------------------------------------------------------
-GREETINGS:	LBZ 0b11;		// BU = 3, BL = 0 ("free column")
-			JMS CRLF;
-			JMS H;
-			JMS E;
-			JMS L;
-			JMS L;
-			JMS O;
-			JMS SPACE;
-			JMS W;
-			JMS O;
-			JMS R;
-			JMS L;
-			JMS D;
-			JMS EXCPOINT;
-			JMP CRLF;
-			
-H:			LAI 0x0F & 'H';
-			JMP OUT_4;
-E:			LAI 0x0F & 'E';
-			JMP OUT_4;
-L:			LAI 0x0F & 'L';
-			JMP OUT_4;
-O:			LAI 0x0F & 'O';
-			JMP OUT_4;
-SPACE:		LAI 0x0F & ' ';
-			JMP OUT_2;
-W:			LAI 0x0F & 'W';
-			JMP OUT_5;
-R:			LAI 0x0F & 'R';
-			JMP OUT_5;
-D:			LAI 0x0F & 'D';
-			JMP OUT_4;
-EXCPOINT:	LAI 0x0F & '!';
-OUT_2:		RSM 3;
-			RSM 2;
-			STM 1;
-OUT_xxx0:	RSM 0;
-			OUT;
-			RT;
-
-OUT_4:		RSM 3;
-			STM 2;
-			RSM 1;
-			JMP OUT_xxx0;
-
-OUT_5:		RSM 3;
-			STM 2;
-			RSM 1;
-			STM 0;
-			OUT;
-			RT;
-
-OUT_0:		RSM 3;
-			RSM 2;
-			RSM 1;
-			RSM 0;
-			RT;
-*//
-
+//	---------------------------------------------------------------------------
 			.org 0b1110000000;
 //	Page 14 as an "overflow" from busy subroutine page 15
-// ----------------------------------------------------------------------------
+//	---------------------------------------------------------------------------
 DISP_TTY:	LAI 12;			// start displaying at digit 12 
 			XAE;			// 
 			LBE	0b10;		// BL = 12, BU = 2
@@ -142,10 +78,10 @@ CRLF:		RSM 3;
 			OUT;
 			RT;
 
-			
+//	---------------------------------------------------------------------------
 			.org 0b1111000000;
 //	Page 15 in the bank is the default place for subroutines
-// ----------------------------------------------------------------------------
+//	---------------------------------------------------------------------------
 CLEAR:		LAI 0;			// A = 0, BU set by caller
 			XCI 0;			// Exchange with M[BU, BL], BU = BU, BL++
 			JMP CLEAR;		// repeat until all covered (BU = 0)

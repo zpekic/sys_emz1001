@@ -53,7 +53,7 @@ end EMZ1001A;
 architecture Behavioral of EMZ1001A is
 
 -- function defined in the package pulls in the content of internal 1k ROM
-constant bank0: mem1k8 := firmware;
+constant bank0: mem1k8 := firmware(1);
 
 -- PLA constants
 constant skp_0: std_logic_vector(3 downto 0) := X"0";

@@ -1,0 +1,115 @@
+//---------------------------------------------------------------------------------------------
+//	Hello World test code for EMZ1001 (c) 2022-... zpekic@hotmail.com
+//  Compile with https://github.com/zpekic/MicroCodeCompiler
+//---------------------------------------------------------------------------------------------
+// Test code to load into internal 1k ROM of Iskra EMZ1001 (AMI S2000) 4-bit microcontroller
+// http://www.bitsavers.org/components/ami/s2000/
+// Full description: (TBD link to hackaday project)
+//---------------------------------------------------------------------------------------------
+			.code 10, 8, helloworld_code.mif, helloworld_code.cgf, helloworld_code.coe, hlw:helloworld_code.vhd, helloworld_code.hex, helloworld_code.bin, 1;
+			.symbol 10, 256, helloworld_sym.mif, helloworld_sym.cgf, helloworld_sym.coe, hlw:helloworld_sym.vhd, helloworld_sym.hex, helloworld_sym.bin, 32;
+
+#include "emz1001.mcc";
+
+CR:			.alias 0xD;
+LF:			.alias 0xA;
+
+//	---------------------------------------------------------------------------
+			.org 0;
+//	Execution starts at bank 0, page 0, location 0
+//	---------------------------------------------------------------------------
+			NOP;
+			
+			LAI 0b1000;		// bit3 = 50Hz, bit0 = invert D lines on output
+			EUR;			// set prescaler and inverter
+			
+DEADLOOP: 	LBZ 0;			// select RAM column 0, row 0
+			JMS  CLEAR;		// clear RAM column 0
+			
+			LBZ 1;			// select RAM column 1, row 0
+			JMS  CLEAR; 	// clear RAM column 1
+			
+			LBF 0b10;		// select current column (2), BL = 15
+			PSH;			// set all A lines high
+			MVS;			// all anodes high
+			XCD 0b00;		// BL = 14, keep BU
+			PSH;			// drive D lines, do not float them
+			XCD 0b00;		// BL = 13, keep BU
+			PSL;			// set static operation 
+			
+DISPLOOP:	JMS GREETINGS;	// HELLO WORLD!
+			
+WAIT1S:		SOS;			// check if 1 second lapsed
+			JMP WAIT1S;		// no, re-check
+			JMP DISPLOOP;	// yes, print it out again
+			
+//	---------------------------------------------------------------------------
+			.org 0b1111000000;
+//	Page 15 in the bank is the default place for subroutines
+// ----------------------------------------------------------------------------
+CLEAR:		LAI 0;			// A = 0, BU set by caller
+			XCI 0;			// Exchange with M[BU, BL], BU = BU, BL++
+			JMP CLEAR;		// repeat until all covered (BU = 0)
+			RT;				// back
+			
+GREETINGS:	LBZ 0b11;		// BU = 3, BL = 0 
+			JMS CRLF;
+			JMS H;
+			JMS E;
+			JMS L;
+			JMS L;
+			JMS O;
+			JMS SPACE;
+			JMS W;
+			JMS O;
+			JMS R;
+			JMS L;
+			JMS D;
+			JMS EXCPOINT;
+CRLF:		LAI CR;
+			JMS OUT_0;
+			LAI LF;
+OUT_0:		RSM 3;			// set current RAM location to 0
+			RSM 2;
+			RSM 1;
+			RSM 0;
+			OUT;
+			RT;
+			
+H:			LAI 0x0F & 'H';
+			JMP OUT_4;
+E:			LAI 0x0F & 'E';
+			JMP OUT_4;
+L:			LAI 0x0F & 'L';
+			JMP OUT_4;
+O:			LAI 0x0F & 'O';
+			JMP OUT_4;
+SPACE:		LAI 0x0F & ' ';
+			JMP OUT_2;
+W:			LAI 0x0F & 'W';
+			JMP OUT_5;
+R:			LAI 0x0F & 'R';
+			JMP OUT_5;
+D:			LAI 0x0F & 'D';
+			JMP OUT_4;
+EXCPOINT:	LAI 0x0F & '!';
+OUT_2:		RSM 3;
+			RSM 2;
+			STM 1;
+			RSM 0;
+			OUT;
+			RT;
+
+OUT_4:		RSM 3;
+			STM 2;
+			RSM 1;
+			RSM 0;
+			OUT;
+			RT;
+
+OUT_5:		RSM 3;
+			STM 2;
+			RSM 1;
+			STM 0;
+			OUT;
+			RT;

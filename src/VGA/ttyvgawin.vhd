@@ -109,6 +109,7 @@ signal mem_row, mem_col: std_logic_vector(7 downto 0);
 signal vram: mem2k8 := (others => c(' '));	-- initialize video RAM with space
 signal vram_row: std_logic_vector(4 downto 0);	-- 32
 signal vram_col: std_logic_vector(5 downto 0);	-- 64
+signal row_lookup: std_logic_vector(3 downto 0);
 
 signal char: std_logic_vector(7 downto 0);
 signal char_clk, char_is_zero, char_sent: std_logic;
@@ -144,8 +145,18 @@ mem_col <= std_logic_vector(unsigned(vga_cell(7 downto 0)) - 8);
 mem <= not (mem_row(7) or mem_row(6) or mem_row(5) or mem_col(7) or mem_col(6));
 
 -- give VGA either vram content (if in 64*16 window), or a space
-mem_char <= vram_dout when (mem = '1') else ((vga_cell(10) xor vga_cell(2)) & "000" & vga_cell(9 downto 8) & vga_cell(1 downto 0));
+mem_char <= vram_dout when (mem = '1') else ((vga_cell(11) xor vga_cell(3)) & row_lookup & vga_cell(2 downto 0));
 
+with vga_cell(10 downto 8) select row_lookup <= 
+	"0000" when O"0", 	-- 00..07
+	"0001" when O"1",		-- 08..0F
+	"0010" when O"2",		-- 10..17
+	"0011" when O"3", 	-- 18..1F
+	"1100" when O"4", 	-- 60..67
+	"1101" when O"5", 	-- 68..6F
+	"1110" when O"6", 	-- 70..77
+	"1111" when others;	-- 78..7F
+	
 -- cursor is active if VGA row, col coincide with TTY ones
 cur_x <= '1' when (mem_col = tty_cell(7 downto 0)) else '0';
 cur_y <= '1' when (mem_row = tty_cell(15 downto 8)) else '0';
