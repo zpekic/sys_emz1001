@@ -10,8 +10,11 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.all;
 use IEEE.NUMERIC_STD.ALL;
-use work.fibonacci_code.all;
-use work.helloworld_code.all;
+use STD.textio.all;
+use ieee.std_logic_textio.all;
+
+--use work.fibonacci_code.all;
+--use work.helloworld_code.all;
 
 package emz1001_package is
 
@@ -25,13 +28,18 @@ impure function i(char: in character) return std_logic_vector;
 type mem2k8 is array(0 to 2047) of std_logic_vector(7 downto 0);
 type mem1k8 is array(0 to 1023) of std_logic_vector(7 downto 0);
 type mem256x8 is array(0 to 255) of std_logic_vector(7 downto 0);
+type mem512x8 is array(0 to 511) of std_logic_vector(7 downto 0);
 type mem64x12 is array(0 to 63) of std_logic_vector(11 downto 0);
 type mem64x4 is array(0 to 63) of std_logic_vector(3 downto 0);
+type mem16x32 is array (0 to 15) of std_logic_vector(31 downto 0);
+type mem16x16 is array (0 to 15) of std_logic_vector(15 downto 0);
 type mem16x8 is array(0 to 15) of std_logic_vector(7 downto 0);
 type mem4x14 is array(0 to 3) of std_logic_vector(13 downto 0);
 type mem4x10 is array(0 to 3) of std_logic_vector(9 downto 0);
 
-impure function firmware(sel: in integer) return mem1k8;
+
+impure function init_filememory(file_name : in string; depth: in integer; default_value: std_logic_vector(7 downto 0)) return mem1k8;
+--impure function firmware(sel: in integer) return mem512x8;
 
 constant hex2ascii: mem16x8 := (
 	c('0'),
@@ -52,28 +60,25 @@ constant hex2ascii: mem16x8 := (
 	c('F')
 );
 
-type mem16x16 is array (0 to 15) of std_logic_vector(15 downto 0);
-constant decode4to16: mem16x16 := (
-	"0000000000000001",
-	"0000000000000010",
-	"0000000000000100",
-	"0000000000001000",
-	"0000000000010000",
-	"0000000000100000",
-	"0000000001000000",
-	"0000000010000000",
-	"0000000100000000",
-	"0000001000000000",
-	"0000010000000000",
-	"0000100000000000",
-	"0001000000000000",
-	"0010000000000000",
-	"0100000000000000",
-	"1000000000000000"
-);
-
-
-	
+--constant decode4to16: mem16x16 := (
+--	"0000000000000001",
+--	"0000000000000010",
+--	"0000000000000100",
+--	"0000000000001000",
+--	"0000000000010000",
+--	"0000000000100000",
+--	"0000000001000000",
+--	"0000000010000000",
+--	"0000000100000000",
+--	"0000001000000000",
+--	"0000010000000000",
+--	"0000100000000000",
+--	"0001000000000000",
+--	"0010000000000000",
+--	"0100000000000000",
+--	"1000000000000000"
+--);
+--	
 -- type <new_type> is
 --  record
 --    <type_name>        : std_logic_vector( 7 downto 0);
@@ -131,24 +136,110 @@ begin
 	return X"80" xor c(char);
 end i;
 
-impure function firmware(sel: in integer) return mem1k8 is
-variable temp: mem1k8;
-begin
-	if (sel = 0) then
-		assert true report "FIRMWARE: start initializing (fibonacci example)" severity note;
-		for i in 0 to 1023 loop
-			temp(i) := fib_microcode(i);
-		end loop;
-	else
-		assert true report "FIRMWARE: start initializing (helloworld example)" severity note;
-		for i in 0 to 1023 loop
-			temp(i) := hlw_microcode(i);
-		end loop;
-	end if;
-	
-	assert true report "FIRMWARE: done initializing" severity note;
+impure function init_filememory(file_name : in string; depth: in integer; default_value: std_logic_vector(7 downto 0)) return mem1k8 is
+variable temp_mem : mem1k8;
+variable i, addr_start, addr_end: integer range 0 to (depth - 1);
+variable location: std_logic_vector(7 downto 0);
+file input_file : text open read_mode is file_name;
+variable input_line : line;
+variable line_current: integer := 0;
+variable address: std_logic_vector(15 downto 0);
+variable byte_count, record_type, byte_value: std_logic_vector(7 downto 0);
+variable firstChar: character;
+variable count: integer;
+variable isOk: boolean;
 
-	return temp;
-end firmware;
+begin
+	-- fill with default value
+--	for i in 0 to depth - 1 loop	
+--			temp_mem(i) := default_value;
+--	end loop;
+
+	 -- parse the file for the data
+	 -- format described here: https://en.wikipedia.org/wiki/Intel_HEX
+	 assert false report file_name & ": loading up to " & integer'image(depth) & " bytes." severity note;
+	 loop 
+		line_current := line_current + 1;
+      readline (input_file, input_line);
+		exit when endfile(input_file); --till the end of file is reached continue.
+
+		read(input_line, firstChar);
+		if (firstChar = ':') then
+			hread(input_line, byte_count);
+			hread(input_line, address);
+			hread(input_line, record_type);
+			case record_type is
+				when X"00" => -- DATA
+					count := to_integer(unsigned(byte_count));
+					if (count > 0) then
+						addr_start := to_integer(unsigned(address));
+						addr_end := addr_start + to_integer(unsigned(byte_count)) - 1;
+						report file_name & ": parsing line " & integer'image(line_current) & " for " & integer'image(count) & " bytes at address " & integer'image(addr_start) severity note;
+						for i in addr_start to addr_end loop
+							hread(input_line, byte_value);
+							if (i < depth) then
+								temp_mem(i) := byte_value;
+							else
+								report file_name & ": line " & integer'image(line_current) & " data beyond memory capacity ignored" severity note;
+							end if;
+						end loop;
+					else
+						report file_name  & ": line " & integer'image(line_current) & " has no data" severity note;
+					end if;
+				when X"01" => -- EOF
+					report file_name & ": line " & integer'image(line_current) & " eof record type detected" severity note;
+					exit;
+				when others =>
+					report file_name & ": line " & integer'image(line_current) & " unsupported record type detected" severity failure;
+			end case;
+		else
+			report file_name & ": line " & integer'image(line_current) & " does not start with ':' " severity failure;
+		end if;
+	end loop; -- next line in file
+
+	file_close(input_file);
+
+   return temp_mem;
+	
+end init_filememory;
+
+--
+--impure function firmware(sel: in integer) return mem512x8 is
+--variable temp: mem512x8;
+--begin
+--	if (sel = 0) then
+--		assert true report "FIRMWARE: start initializing (fibonacci example)" severity note;
+----		for i in 0 to 1023 loop
+----			if ((i < 256) or (i >= 768)) then 
+----				temp(i) := fib_microcode(i);
+----			end if;
+----		end loop;
+--		for i in 0 to 511 loop
+--			if (i > 255) then
+--				temp(i) := fib_microcode(i + 512);
+--			else
+--				temp(i) := fib_microcode(i);
+--			end if;
+--		end loop;
+--	else
+--		assert true report "FIRMWARE: start initializing (helloworld example)" severity note;
+----		for i in 0 to 1023 loop
+----			if ((i < 256) or (i >= 768)) then 
+----				temp(i) := hlw_microcode(i);
+----			end if;
+----		end loop;
+--		for i in 0 to 511 loop
+--			if (i > 255) then
+--				temp(i) := hlw_microcode(i + 512);
+--			else
+--				temp(i) := hlw_microcode(i);
+--			end if;
+--		end loop;
+--	end if;
+--	
+--	assert true report "FIRMWARE: done initializing" severity note;
+--
+--	return temp;
+--end firmware;
 
 end emz1001_package;

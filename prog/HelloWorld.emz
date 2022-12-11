@@ -13,6 +13,15 @@
 
 CR:			.alias 0xD;
 LF:			.alias 0xA;
+LED_SPACE:	.alias 0b00000000;
+LED_H:		.alias 0b00110111;
+LED_E:		.alias 0b01001111;
+LED_L:		.alias 0b00001110;
+LED_O:		.alias 0b00011101;
+LED_W:		.alias 0b00111111;
+LED_R:		.alias 0b00000101;
+LED_D:		.alias 0b00111101;
+LED_EXCL:	.alias 0b10110000;
 
 //	---------------------------------------------------------------------------
 			.org 0;
@@ -22,13 +31,7 @@ LF:			.alias 0xA;
 			
 			LAI 0b1000;		// bit3 = 50Hz, bit0 = invert D lines on output
 			EUR;			// set prescaler and inverter
-			
-DEADLOOP: 	LBZ 0;			// select RAM column 0, row 0
-			JMS  CLEAR;		// clear RAM column 0
-			
-			LBZ 1;			// select RAM column 1, row 0
-			JMS  CLEAR; 	// clear RAM column 1
-			
+						
 			LBF 0b10;		// select current column (2), BL = 15
 			PSH;			// set all A lines high
 			MVS;			// all anodes high
@@ -37,23 +40,11 @@ DEADLOOP: 	LBZ 0;			// select RAM column 0, row 0
 			XCD 0b00;		// BL = 13, keep BU
 			PSL;			// set static operation 
 			
-DISPLOOP:	JMS GREETINGS;	// HELLO WORLD!
-			
-WAIT1S:		SOS;			// check if 1 second lapsed
-			JMP WAIT1S;		// no, re-check
-			JMP DISPLOOP;	// yes, print it out again
-			
-//	---------------------------------------------------------------------------
-			.org 0b1111000000;
-//	Page 15 in the bank is the default place for subroutines
-// ----------------------------------------------------------------------------
-CLEAR:		LAI 0;			// A = 0, BU set by caller
-			XCI 0;			// Exchange with M[BU, BL], BU = BU, BL++
-			JMP CLEAR;		// repeat until all covered (BU = 0)
-			RT;				// back
+			JMS INIT_LED1;
+			JMS INIT_LED0;
 			
 GREETINGS:	LBZ 0b11;		// BU = 3, BL = 0 
-			JMS CRLF;
+//			JMS CRLF;
 			JMS H;
 			JMS E;
 			JMS L;
@@ -66,50 +57,161 @@ GREETINGS:	LBZ 0b11;		// BU = 3, BL = 0
 			JMS L;
 			JMS D;
 			JMS EXCPOINT;
+			JMS CRLF;
+			
+DISPLOOP:	JMS DISP_LED;	// Refresh 7-seg display
+			SOS;			// check if 1 second lapsed
+			JMP DISPLOOP;	// no, continue refreshing LEDs as fast as possible
+			LBF 0b00;
+			JMS ROTATE;		// yes, rotate the marquee
+			LBF 0b01;
+			JMS ROTATE;
+			JMP GREETINGS;	// continue ad infinitum
+
+//	---------------------------------------------------------------------------
+			.org 0b1101000000;
+//	Page 13 for more subroutines
+// ----------------------------------------------------------------------------
+INITLED1_:	LBF 1;
+			JMS CLEAR4;
+			LAI LED_H / 16;
+			XCD 0b00;
+			LAI LED_E / 16;
+			XCD 0b00;
+			LAI LED_L / 16;
+			XCD 0b00;
+			LAI LED_L / 16;
+			XCD 0b00;
+			LAI LED_O / 16;
+			XCD 0b00;
+			LAI LED_SPACE / 16;
+			XCD 0b00;
+			LAI LED_W / 16;
+			XCD 0b00;
+			LAI LED_O / 16;
+			XCD 0b00;
+			LAI LED_R / 16;
+			XCD 0b00;
+			LAI LED_L / 16;
+			XCD 0b00;
+			LAI LED_D / 16;
+			XCD 0b00;
+			LAI LED_EXCL / 16;
+			JMP INIT_DONE;
+
+INITLED0_:	LBF 0;
+			JMS CLEAR4;
+			LAI 0xF & LED_H;
+			XCD 0b00;
+			LAI 0xF & LED_E;
+			XCD 0b00;
+			LAI 0xF & LED_L;
+			XCD 0b00;
+			LAI 0xF & LED_L;
+			XCD 0b00;
+			LAI 0xF & LED_O;
+			XCD 0b00;
+			LAI 0xF & LED_SPACE;
+			XCD 0b00;
+			LAI 0xF & LED_W;
+			XCD 0b00;
+			LAI 0xF & LED_O;
+			XCD 0b00;
+			LAI 0xF & LED_R;
+			XCD 0b00;
+			LAI 0xF & LED_L;
+			XCD 0b00;
+			LAI 0xF & LED_D;
+			XCD 0b00;
+			LAI 0xF & LED_EXCL;
+INIT_DONE:	XCD 0b00;
+			RT;
+			RT;
+
+//	---------------------------------------------------------------------------
+			.org 0b1110000000;
+//	Page 14 in the bank is for the subroutines overflow
+// ----------------------------------------------------------------------------
+DISP_LED_:	LAI 12;			// start displaying at digit 12 
+			XAE;			// 
+			LBE	0b00;		// BL = 12, BU = 0
+LEDLOOP:	LAM 0b01;		// A <= M[0, BL], BU = 1
+			DISB;			// direct pattern to D outputs (inverted)
+			PSL;			// prepare digit low (on)
+			MVS;			// update A pins (A[BL] <= '0')
+			NOP;			// delay to keep it lit for a bit
+			NOP;
+			PSH;			// prepare digit high (off)
+			MVS;			// update A pins (A[BL] <= '1')
+			LAM 0b00;
+			XCD	0b01;		// next, change column to 0
+			JMP LEDLOOP;			
+			RT;
+			
+//	---------------------------------------------------------------------------
+			.org 0b1111000000;
+//	Page 15 in the bank is the default place for subroutines
+// ----------------------------------------------------------------------------			
+ROTATE:		LAM 0b00;
+			XCI 0b00;
+			NOP;
+ROTLOOP:	XCI 0b00;
+			JMP ROTLOOP;
+			RT;
+			
+INIT_LED0:	PP 13;
+			JMP INITLED0_;
+			
+INIT_LED1: 	PP 13;
+			JMP INITLED1_;
+
+DISP_LED:	PP 14;
+			JMP DISP_LED_;
+				
 CRLF:		LAI CR;
 			JMS OUT_0;
 			LAI LF;
 OUT_0:		RSM 3;			// set current RAM location to 0
 			RSM 2;
-			RSM 1;
-			RSM 0;
+OUT_xx00:	RSM 1;
+OUT_xxx0:	RSM 0;
 			OUT;
 			RT;
 			
 H:			LAI 0x0F & 'H';
-			JMP OUT_4;
 E:			LAI 0x0F & 'E';
-			JMP OUT_4;
 L:			LAI 0x0F & 'L';
-			JMP OUT_4;
 O:			LAI 0x0F & 'O';
-			JMP OUT_4;
-SPACE:		LAI 0x0F & ' ';
-			JMP OUT_2;
-W:			LAI 0x0F & 'W';
-			JMP OUT_5;
-R:			LAI 0x0F & 'R';
-			JMP OUT_5;
 D:			LAI 0x0F & 'D';
-			JMP OUT_4;
-EXCPOINT:	LAI 0x0F & '!';
-OUT_2:		RSM 3;
-			RSM 2;
-			STM 1;
-			RSM 0;
-			OUT;
-			RT;
-
 OUT_4:		RSM 3;
 			STM 2;
-			RSM 1;
-			RSM 0;
-			OUT;
-			RT;
+			JMP OUT_xx00;
 
+W:			LAI 0x0F & 'W';
+R:			LAI 0x0F & 'R';
 OUT_5:		RSM 3;
 			STM 2;
 			RSM 1;
 			STM 0;
 			OUT;
 			RT;
+			
+SPACE:		LAI 0x0F & ' ';
+EXCPOINT:	LAI 0x0F & '!';
+OUT_2:		RSM 3;
+			RSM 2;
+			STM 1;
+			JMP OUT_xxx0;
+
+CLEAR4:		LAI 0;
+			XCD 0b00;
+			NOP;
+			LAI 0;
+			XCD 0b00;
+			LAI 0;
+			XCD 0b00;
+			LAI 0;
+			XCD 0b00;
+			RT;
+			RT;
+

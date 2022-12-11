@@ -102,13 +102,13 @@ signal cur_x, cur_y, cursor_enable: std_logic;
 signal vram_dout, tty_dout: std_logic_vector(7 downto 0);
 signal tty_wr, tty_rd: std_logic;
 
-signal vram_a: std_logic_vector(10 downto 0);
+signal vram_a: std_logic_vector(9 downto 0);
 signal mem: std_logic;
 signal mem_char: std_logic_vector(7 downto 0);
 signal mem_row, mem_col: std_logic_vector(7 downto 0);
-signal vram: mem2k8 := (others => c(' '));	-- initialize video RAM with space
+signal vram: mem1k8 := (others => c(' '));	-- initialize video RAM with space
 signal vram_row: std_logic_vector(4 downto 0);	-- 32
-signal vram_col: std_logic_vector(5 downto 0);	-- 64
+signal vram_col: std_logic_vector(4 downto 0);	-- 32
 signal row_lookup: std_logic_vector(3 downto 0);
 
 signal char: std_logic_vector(7 downto 0);
@@ -125,8 +125,8 @@ vga_active <= hactive and vactive;
 --tty_a <= tty_cell(12 downto 8) & tty_cell(5 downto 0);
 --vga_a <= std_logic_vector(unsigned(vga_cell(12 downto 8)) - 14) & std_logic_vector(unsigned(vga_cell(5 downto 0)) - 8);
 
--- 2k video RAM read and write
-vram_col <= tty_cell(5 downto 0) when ((tty_rd or tty_wr) = '1') else mem_col(5 downto 0);
+-- 1k video RAM read and write
+vram_col <= tty_cell(4 downto 0) when ((tty_rd or tty_wr) = '1') else mem_col(4 downto 0);
 vram_row <= tty_cell(12 downto 8) when ((tty_rd or tty_wr) = '1') else mem_row(4 downto 0);
 vram_a <= vram_row & vram_col;
 vram_dout <= vram(to_integer(unsigned(vram_a)));
@@ -138,11 +138,11 @@ begin
 	end if;
 end process;
 
--- to minimize video RAM, only show center 64*32
+-- to minimize video RAM, only show center 32*32
 -- show 16*16 window with top, left at screen center
 mem_row <= std_logic_vector(unsigned(vga_cell(15 downto 8)) - 14);
 mem_col <= std_logic_vector(unsigned(vga_cell(7 downto 0)) - 8);
-mem <= not (mem_row(7) or mem_row(6) or mem_row(5) or mem_col(7) or mem_col(6));
+mem <= not (mem_row(7) or mem_row(6) or mem_row(5) or mem_col(7) or mem_col(6) or mem_col(5));
 
 -- give VGA either vram content (if in 64*16 window), or a space
 mem_char <= vram_dout when (mem = '1') else ((vga_cell(11) xor vga_cell(3)) & row_lookup & vga_cell(2 downto 0));
@@ -209,7 +209,7 @@ tty: tty_screen Port map (
 		char_sent => char_sent,
 		---
 		maxRow => X"20",	-- 32
-		maxCol => X"40",	-- 64
+		maxCol => X"20",	-- 32
 		mrd => tty_rd,
 		mwr => tty_wr,
 		x => tty_cell(7 downto 0),

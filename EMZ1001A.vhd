@@ -53,7 +53,8 @@ end EMZ1001A;
 architecture Behavioral of EMZ1001A is
 
 -- function defined in the package pulls in the content of internal 1k ROM
-constant bank0: mem1k8 := firmware(1);
+constant bank0: mem1k8 := init_filememory("..\prog\helloworld_code.hex", 1024, X"00");
+--constant bank0: mem1k8 := init_filememory("..\prog\fibonacci_code.hex", 1024, X"00");
 
 -- PLA constants
 constant skp_0: std_logic_vector(3 downto 0) := X"0";
@@ -254,23 +255,23 @@ skp_0 & alu_nop & opr_lai	-- LAI
 ); 
 
 -- used for PSH (OR, non-inverted) and PSL (AND, inverted)
-constant psx_mask: mem16x16 := (
-	"0000000000000001",
-	"0000000000000010",
-	"0000000000000100",
-	"0000000000001000",
-	"0000000000010000",
-	"0000000000100000",
-	"0000000001000000",
-	"0000000010000000",
-	"0000000100000000",
-	"0000001000000000",
-	"0000010000000000",
-	"0000100000000000",
-	"0001000000000000",
-	"0010000000000000",
-	"0100000000000000",
-	"1111111111111111"	-- set (or clear) all bits
+constant psx_mask: mem16x32 := (
+	"11111111111111100000000000000001",
+	"11111111111111010000000000000010",
+	"11111111111110110000000000000100",
+	"11111111111101110000000000001000",
+	"11111111111011110000000000010000",
+	"11111111110111110000000000100000",
+	"11111111101111110000000001000000",
+	"11111111011111110000000010000000",
+	"11111110111111110000000100000000",
+	"11111101111111110000001000000000",
+	"11111011111111110000010000000000",
+	"11110111111111110000100000000000",
+	"11101111111111110001000000000000",
+	"11011111111111110010000000000000",
+	"10111111111111110100000000000000",
+	"00000000000000001111111111111111"	-- set (or clear) all bits
 );
 
 -- seven segment pattern for DISN instruction
@@ -366,7 +367,7 @@ signal ram: std_logic_vector(3 downto 0);	-- represents currently selected RAM c
 signal ram_addr: std_logic_vector(5 downto 0);
 signal y_alu: std_logic_vector(5 downto 0);	-- 6-bit ALU output
 signal y_skp: std_logic;
-signal bl_is_e, a_is_m, bl_is_0, bl_is_f, bit_is_1, bl_is_13: std_logic;
+signal bl_equals_e, a_equals_m, bit_is_1: std_logic;
 signal ik: std_logic_vector(3 downto 0);
 signal disn_out, disb_out, dout: std_logic_vector(7 downto 0);
 signal skp_mask, mask8: std_logic_vector(7 downto 0);
@@ -375,7 +376,13 @@ signal bu_xor: std_logic_vector(1 downto 0);
 
 alias i_clk: std_logic is I(3);	-- assume I3 is hooked up to 50/60Hz mains frequency
 
-signal psx: std_logic_vector(15 downto 0);
+signal psx: std_logic_vector(31 downto 0);
+alias psx_ormask: std_logic_vector(15 downto 0) is psx(15 downto 0);
+alias psx_andmask: std_logic_vector(15 downto 0) is psx(31 downto 16);
+alias bl_is_0: std_logic is psx(0);
+alias bl_is_13: std_logic is psx(13);
+alias bl_is_15: std_logic is psx(15);
+
 signal eur: std_logic_vector(13 downto 0);	-- combines mains counter limit with xor mask
 alias eur_invert: std_logic_vector(7 downto 0) is eur(7 downto 0);	-- for XOR of DISP, DISN outputs
 alias eur_limit: std_logic_vector(5 downto 0) is eur(13 downto 8);	-- to count toward 1s 
@@ -501,15 +508,15 @@ with alu select y_alu <=
 
 -- select source for updated skip flag (16 to 1 mux)
 with skp select y_skp <=
-		'0' 	when skp_0,	-- never skip next instruction
+--		'0' 	when skp_0,	-- never skip next instruction
 		'1' 	when skp_1,	-- always skip next instruction
 		ir_sec  when skp_sec,
-		bl_is_e when skp_ble,
+		bl_equals_e when skp_ble,
 		(not mr_cy) when skp_cy0,
 		(not y_alu(5)) when skp_cout,
-		a_is_m when skp_am,
+		a_equals_m when skp_am,
 		(not bit_is_1) when skp_bit,	
-		bl_is_f when skp_blf,
+		bl_is_15 when skp_blf,
 		bl_is_0 when skp_bl0, 
 		not(ik(3) and ik(2) and ik(1) and ik(0)) when skp_ik,	-- at least 1 zero detected in I or K after masking	
 		ir_skp when skp_skp,	-- do not change skip flag, pass it to next instruction
@@ -518,11 +525,8 @@ with skp select y_skp <=
 		'0' when others;		-- no skip by default
 
 -- conditions for skips
-bl_is_e <= '1' when (mr_bl = mr_e) else '0';
-bl_is_0 <= psx(0);
-bl_is_13 <= psx(13);
-bl_is_f <= psx(15);
-a_is_m <= '1' when (mr_a = ram) else '0';
+bl_equals_e <= '1' when (mr_bl = mr_e) else '0';
+a_equals_m <= '1' when (mr_a = ram) else '0';
 
 -- SZM
 with ir_current(1 downto 0) select bit_is_1 <=
@@ -567,6 +571,7 @@ begin
 					if ((ROMS = '1') or (ir_bank = "000")) then
 						-- fetch from bank0 which is inside the chip
 						ir_current <= skp_mask and bank0(to_integer(unsigned(pc)));
+						--ir_current <= skp_mask and bank0(to_integer(unsigned(pc(8 downto 0))));
 					else
 						-- fetch from any bank, outside of the chip
 						ir_current <= skp_mask and D;
@@ -629,9 +634,9 @@ begin
 									null; -- implemented through "sos_clr" signal;
 								when opr_psx =>	-- PSH, PSL
 									if (ir_current(0) = '0') then
-										mr_master <= mr_master or psx; -- PSH
+										mr_master <= mr_master or psx_ormask; -- PSH
 									else
-										mr_master <= mr_master and (psx xor X"FFFF"); -- PSL
+										mr_master <= mr_master and psx_andmask; -- PSL
 									end if;
 								when opr_alu =>	-- ADD, ADCS, ADIS, AND, XOR, CMA, STC, RSC 
 									mr_cy <= y_alu(5); 
@@ -814,7 +819,7 @@ with dbg_sel(3 downto 0) select dbg_lo <=
 	mr_master(3 downto 0) 	when X"A",
 	mr_a 							when X"9",
 	mr_e 							when X"8",
-	"000" & ir_sec 				when X"7",
+	"000" & ir_sec 			when X"7",
 	"000" & mr_f1 				when X"6",
 	"000" & ir_skp 			when X"5",
 	ir_dout(3 downto 0) 		when X"4",
@@ -825,12 +830,12 @@ with dbg_sel(3 downto 0) select dbg_lo <=
 with dbg_sel(3 downto 0) select dbg_hi <=
 	'0' & pc(5 downto 3) 	when X"F",	-- PC: location as octal
 	ir_current(7 downto 4) 	when X"E",
-	X"0"				 			when X"D",
-	X"0"							when X"C",
+--	X"0"				 			when X"D",
+--	X"0"							when X"C",
 	"00" & mr_bu				when X"B",
 	mr_master(7 downto 4)	when X"A",
-	X"0" 							when X"9",
-	X"0" 							when X"8",
+--	X"0" 							when X"9",
+--	X"0" 							when X"8",
 	"000" & mr_cy		 		when X"7",
 	"000" & mr_f2 				when X"6",
 	"000" & ir_run 			when X"5",

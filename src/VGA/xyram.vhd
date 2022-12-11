@@ -47,15 +47,15 @@ end xyram;
 
 architecture Behavioral of xyram is
 
-type lookup is array(0 to 127) of std_logic_vector(15 downto 0);
+type lookup is array(0 to 63) of std_logic_vector(15 downto 0);
 
 impure function init_lookup(offset: in integer) return lookup is
 variable temp_mem : lookup;
-variable i: integer range 0 to 127;
+variable i: integer range 0 to 63;
 
 begin
 	-- fill with constant multiply table
-	for i in 0 to 127 loop	
+	for i in 0 to 63 loop	
 			temp_mem(i) := std_logic_vector(to_unsigned(i * offset, 16));
 	end loop;
 

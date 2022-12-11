@@ -87,7 +87,7 @@ with cpuclk_sel select cpu_clk <=
 	freq_25M(10)	when "100",	-- 24.4140625kHz
 	freq_25M(8)		when "101",	-- 97.65625kHz
 	freq_25M(6)		when "110",	-- 390.625kHz
-	freq_25M(2)		when others;	-- 6.25MHz --1.5625MHz
+	freq_25M(2)		when others;	-- 6.25MHz 
 	
 -- single step lets through 4 clock cycles and then stops until next "pulse" signal is received
 -- this way each press on the single-step button allows 1 full machine cycle
