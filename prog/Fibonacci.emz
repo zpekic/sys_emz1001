@@ -4,7 +4,8 @@
 //---------------------------------------------------------------------------------------------
 // Test code to load into internal 1k ROM of Iskra EMZ1001 (AMI S2000) 4-bit microcontroller
 // http://www.bitsavers.org/components/ami/s2000/
-// Full description: (TBD link to hackaday project)
+// Full description: 
+// https://hackaday.io/project/188614-iskra-emz1001a-a-virtual-resurrection/log/214196-test-code-fibonacci-sequence-generator
 //---------------------------------------------------------------------------------------------
 			.code 10, 8, fibonacci_code.mif, fibonacci_code.cgf, fibonacci_code.coe, fib:fibonacci_code.vhd, fibonacci_code.hex, fibonacci_code.bin, 1;
 			.symbol 10, 256, fibonacci_sym.mif, fibonacci_sym.cgf, fibonacci_sym.coe, fib:fibonacci_sym.vhd, fibonacci_sym.hex, fibonacci_sym.bin, 32;
@@ -68,13 +69,13 @@ TTYLOOP:	LAI 3;			// ASCII digits 0..9 are hex 0x30 to 0x39
 			OUT;			// D pins <= 3X, strobe EXT low
 			XCD	0b00;		// next, do not change column
 			JMP TTYLOOP;
-CRLF:		RSM 3;
+CRLF:		RSM 3;			// clear M[BU, BL]
 			RSM 2;
 			RSM 1;
 			RSM 0;
-			LAI CR;			// BL is 15, which is assumed to be 0
+			LAI CR;			// High nibble from M, low nibble from A give ASCII code
 			OUT;
-			LAI LF;	
+			LAI LF;			// Line feed ASCII code
 			OUT;
 			RT;
 

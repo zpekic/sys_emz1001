@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------------
--- Company: @Home
--- Engineer: zpekic@hotmail.com
--- 
+-- Company: 	https://hackaday.io/projects/hacker/233652
+-- Engineer:	zpekic@hotmail.com
+---------------------------------------------------------------------------------- 
 -- Create Date: 10/15/2022 11:13:02 PM
 -- Design Name: FPGA implementation of Iskra EMZ1001 4-bit microcontroller
 -- Module Name: sys_emz1001_mercury - Behavioral
@@ -10,13 +10,16 @@
 -- Input devices: 
 --
 -- Tool Versions: ISE 14.7 (nt)
--- Description: 
+-- Description:    EMZ1001 series was the only microcontroller designed and produced in 
+--						 ex-Yugoslavia. It was a co-production with AMI (known as S2000)
+-- 					 https://hackaday.io/project/188614-iskra-emz1001a-a-virtual-resurrection
 -- 
 -- Dependencies: 
 -- 
 -- Revision:
 -- Revision 0.99 - Kinda works...
--- Additional Comments:
+-- Additional Comments: 
+-- https://hackaday.io/project/188614-iskra-emz1001a-a-virtual-resurrection/log/214192-system-description
 ----------------------------------------------------------------------------------
 
 
@@ -248,6 +251,9 @@ constant lookup1: mem16x8 := (
 	c('?')
 );
 
+-- "External ROM" in bank 0 holds Fibonacci code
+constant bank0: mem1k8 := init_filememory("..\prog\fibonacci_code.hex", 1024, X"00");
+signal extrom: std_logic_vector(7 downto 0);
 
 signal RESET: std_logic;
 
@@ -287,6 +293,7 @@ signal win_hex: std_logic_vector(3 downto 0);
 -- EMZ1001A bus
 signal A: std_logic_vector(12 downto 0);
 signal D: std_logic_vector(7 downto 0);
+signal SYNC: std_logic;
 signal emz_i: std_logic_vector(3 downto 0);
 signal emz_nExt: std_logic;
 -- EMZ1001A debug
@@ -303,6 +310,9 @@ begin
 
 -- master reset
 RESET <= USR_BTN;
+
+-- external ROM
+--D <= bank0(to_integer(unsigned(A))) when (SYNC = '0') else "ZZZZZZZZ";
 
 -- microcontroller!
 mc: EMZ1001A Port map ( 

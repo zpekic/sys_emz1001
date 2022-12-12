@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------------
 -- Company:  		https://hackaday.io/projects/hacker/233652
 -- Engineer: 		zpekic@hotmail.com
--- 
+---------------------------------------------------------------------------------- 
 -- Create Date:    12:27:39 11/25/2022 
 -- Design Name:    Iskra 
 -- Module Name:    EMZ1001A - Behavioral 
@@ -10,12 +10,13 @@
 -- Tool versions:  Xilinx ISE 14.7 (last free)
 -- Description:    EMZ1001 series was the only microcontroller designed and produced in 
 --						 ex-Yugoslavia. It was a co-production with AMI (known as S2000)
+-- 					 https://hackaday.io/project/188614-iskra-emz1001a-a-virtual-resurrection
 -- Dependencies: 	 Standard VHDL libraries only
 --
 -- Revision: 
 -- Revision 0.01 - File Created
 -- Additional Comments: 
---
+-- https://hackaday.io/project/188614-iskra-emz1001a-a-virtual-resurrection/log/214193-emz1001a-implementation-in-vhdl
 ----------------------------------------------------------------------------------
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
@@ -340,6 +341,14 @@ signal ir_eur:	std_logic_vector(1 downto 0);		-- middle 2-bits from A are ignore
 signal ir_sec: std_logic:= '1';	-- set when 1 second expires
 signal ir_cnt: std_logic_vector(5 downto 0);		-- counts to 50 or 60, so 6 bits are enough
 
+-- captures ROMS state when SYNC is low and high
+-- 00 ROMS tied low			-- internal ROM for bank 0, external for banks 1 .. 7
+-- 01	ROMS tied to SYNC		-- always external ROM, regardless of the bank
+-- 10	ROMS tied to /SYNC 	-- test mode (not implemented)
+-- 11	ROMS tied to high		-- always internal ROM, regardless of the bank
+signal ir_roms: std_logic_vector(1 downto 0);
+signal ir_introm: std_logic;
+
 -- program control
 signal ir_stack : mem4x10;
 signal ir_sp: std_logic_vector(1 downto 0);		-- 4 deep level stack (1 more than original, yay!)
@@ -391,8 +400,8 @@ signal bl_incdec: std_logic_vector(7 downto 0);
 alias bl_inc: std_logic_vector(3 downto 0) is bl_incdec(7 downto 4); -- 16 values, 4 bits
 alias bl_dec: std_logic_vector(3 downto 0) is bl_incdec(3 downto 0);
 
-signal e_incdec: std_logic_vector(7 downto 0);
-alias e_inc: std_logic_vector(3 downto 0) is e_incdec(7 downto 4);
+--signal e_incdec: std_logic_vector(7 downto 0);
+--alias e_inc: std_logic_vector(3 downto 0) is e_incdec(7 downto 4);
 
 signal sp_incdec: std_logic_vector(3 downto 0);
 alias sp_inc: std_logic_vector(1 downto 0) is sp_incdec(3 downto 2);	-- 4 values, 2 bits
@@ -418,6 +427,13 @@ STATUS <= (t1 and (not mr_d_driven)) or (t3 and bl_is_13) or (t5 and mr_cy) or (
 nEXTERNAL <= not(t7 and out_exe); 
 out_exe <= ir_run when (opr = opr_out) else '0';
 
+-- decide if internal or external ROM is used
+with ir_roms select ir_introm <= 
+	not(ir_bank(2) or ir_bank(1) or ir_bank(0))	when "00", -- LOW, internal for bank0, external for others 
+	'0' 														when "01", -- SYNC, always external
+	'1' 														when "10", -- /SYNC, not implemented test mode, assume "internal"
+	'1' 														when others; -- HI, always internal
+	
 -- D is either floating, or driven from internal dout
 D <= dout; -- when (mr_d_driven = '1') else "ZZZZZZZZ";
 -- internal dout is RAM & A when execution OUT instruction, or output latch otherwise
@@ -470,7 +486,7 @@ disb_out <= eur_invert xor (ram & mr_a);																-- combine RAM and A
 
 -- save a few adders
 bl_incdec <= incdec(to_integer(unsigned(mr_bl)));
-e_incdec <= incdec(to_integer(unsigned(mr_e)));
+--e_incdec <= incdec(to_integer(unsigned(mr_e)));
 
 with ir_sp select sp_incdec <=
 	"0111" when "00",
@@ -559,19 +575,20 @@ begin
 	else
 		if (falling_edge(CLK)) then
 			t <= t(2 downto 0) & t(3); -- one hot ring counter
-			--if (t1 = '1') then
-			-- no stuff happening in T1
-			--end if;
+			if (t1 = '1') then
+				-- capture in the middle of SYNC low
+				ir_roms(1) <= ROMS;
+				-- no other stuff happening in T1
+			end if;
+			-- capture in the middle of SYNC high
+			ir_roms(0) <= (ROMS and t5) or (ir_roms(0) and (not t5));
 			-- run FF was set at rising edge turing T3 so we have it for T3, T5, T7
 			if (ir_run = '1') then
 				if (t3 = '1') then
 				-- T3: regardless of skip, load instruction register
-				-- TODO: take SYNC into account to implement full instruction read logic
-					--ir_previous <= ir_current;
-					if ((ROMS = '1') or (ir_bank = "000")) then
+					if (ir_introm = '1') then
 						-- fetch from bank0 which is inside the chip
 						ir_current <= skp_mask and bank0(to_integer(unsigned(pc)));
-						--ir_current <= skp_mask and bank0(to_integer(unsigned(pc(8 downto 0))));
 					else
 						-- fetch from any bank, outside of the chip
 						ir_current <= skp_mask and D;
@@ -615,7 +632,7 @@ begin
 						when opr_lbp =>	-- LBEP
 							ir_lai <= '0';
 							if (ir_lbx = '0') then	-- only execute if previous was not 
-								mr_bl <= e_inc;
+								mr_bl <= std_logic_vector(unsigned(mr_e) + 1);
 								mr_bu <= ir_current(1 downto 0);
 								ir_lbx <= '1';
 							end if;

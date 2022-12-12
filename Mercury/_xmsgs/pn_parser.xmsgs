@@ -8,7 +8,7 @@
 <!-- Copyright (c) 1995-2013 Xilinx, Inc.  All rights reserved.    -->
 
 <messages>
-<msg type="info" file="ProjectMgmt" num="1061" ><arg fmt="%s" index="1">Parsing VHDL file &quot;C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/EMZ1001A.vhd&quot; into library work</arg>
+<msg type="info" file="ProjectMgmt" num="1061" ><arg fmt="%s" index="1">Parsing VHDL file &quot;C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/Mercury/sys_emz1001_mercury.vhd&quot; into library work</arg>
 </msg>
 
 </messages>

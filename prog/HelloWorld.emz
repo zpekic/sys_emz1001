@@ -4,24 +4,25 @@
 //---------------------------------------------------------------------------------------------
 // Test code to load into internal 1k ROM of Iskra EMZ1001 (AMI S2000) 4-bit microcontroller
 // http://www.bitsavers.org/components/ami/s2000/
-// Full description: (TBD link to hackaday project)
+// Full description: 
+// https://hackaday.io/project/188614-iskra-emz1001a-a-virtual-resurrection/log/214195-test-code-hello-world
 //---------------------------------------------------------------------------------------------
 			.code 10, 8, helloworld_code.mif, helloworld_code.cgf, helloworld_code.coe, hlw:helloworld_code.vhd, helloworld_code.hex, helloworld_code.bin, 1;
 			.symbol 10, 256, helloworld_sym.mif, helloworld_sym.cgf, helloworld_sym.coe, hlw:helloworld_sym.vhd, helloworld_sym.hex, helloworld_sym.bin, 32;
 
 #include "emz1001.mcc";
 
-CR:			.alias 0xD;
-LF:			.alias 0xA;
-LED_SPACE:	.alias 0b00000000;
-LED_H:		.alias 0b00110111;
-LED_E:		.alias 0b01001111;
-LED_L:		.alias 0b00001110;
-LED_O:		.alias 0b00011101;
-LED_W:		.alias 0b00111111;
-LED_R:		.alias 0b00000101;
-LED_D:		.alias 0b00111101;
-LED_EXCL:	.alias 0b10110000;
+CR:			.alias 0xD;			// ASCII code, carriage return
+LF:			.alias 0xA;			// ASCII code, newline
+LED_SPACE:	.alias 0b00000000;	// LED segment patterns
+LED_H:		.alias 0b00110111;	// H
+LED_E:		.alias 0b01001111;	// E
+LED_L:		.alias 0b00001110;	// L
+LED_O:		.alias 0b00011101;	// o
+LED_W:		.alias 0b00111111;	// close enough
+LED_R:		.alias 0b00000101;	// r
+LED_D:		.alias 0b00111101;	// d
+LED_EXCL:	.alias 0b10110000;	// ! (note decimal point is on)
 
 //	---------------------------------------------------------------------------
 			.org 0;
@@ -40,12 +41,12 @@ LED_EXCL:	.alias 0b10110000;
 			XCD 0b00;		// BL = 13, keep BU
 			PSL;			// set static operation 
 			
-			JMS INIT_LED1;
+			JMS INIT_LED1;	// store LED char patterns in memory
 			JMS INIT_LED0;
 			
 GREETINGS:	LBZ 0b11;		// BU = 3, BL = 0 
-//			JMS CRLF;
-			JMS H;
+			JMS CRLF;		// empty line
+			JMS H;			// output character by characted on D port, with nEXT strobe
 			JMS E;
 			JMS L;
 			JMS L;
@@ -63,18 +64,18 @@ DISPLOOP:	JMS DISP_LED;	// Refresh 7-seg display
 			SOS;			// check if 1 second lapsed
 			JMP DISPLOOP;	// no, continue refreshing LEDs as fast as possible
 			LBF 0b00;
-			JMS ROTATE;		// yes, rotate the marquee
+			JMS ROTATE;		// yes, rotate the marquee, RAM bank 0
 			LBF 0b01;
-			JMS ROTATE;
+			JMS ROTATE;		// RAM bank 1 to keep them in sync
 			JMP GREETINGS;	// continue ad infinitum
 
 //	---------------------------------------------------------------------------
 			.org 0b1101000000;
 //	Page 13 for more subroutines
 // ----------------------------------------------------------------------------
-INITLED1_:	LBF 1;
-			JMS CLEAR4;
-			LAI LED_H / 16;
+INITLED1_:	LBF 1;			// RAM bank 1 holds lower nibble of LED patterns
+			JMS CLEAR4;		// clear locations 15, 14, 13, 12
+			LAI LED_H / 16;	// store and decrement BU, leftmost is H (location 12) 
 			XCD 0b00;
 			LAI LED_E / 16;
 			XCD 0b00;
@@ -96,10 +97,10 @@ INITLED1_:	LBF 1;
 			XCD 0b00;
 			LAI LED_D / 16;
 			XCD 0b00;
-			LAI LED_EXCL / 16;
-			JMP INIT_DONE;
+			LAI LED_EXCL / 16;	// rightmost is ! (location 0)
+			JMP INIT_DONE;		// store and return
 
-INITLED0_:	LBF 0;
+INITLED0_:	LBF 0;				// RAM bank 0 holds upper nibble of LED patterns
 			JMS CLEAR4;
 			LAI 0xF & LED_H;
 			XCD 0b00;
@@ -125,7 +126,7 @@ INITLED0_:	LBF 0;
 			XCD 0b00;
 			LAI 0xF & LED_EXCL;
 INIT_DONE:	XCD 0b00;
-			RT;
+			RT;					// don't care for condition, just return
 			RT;
 
 //	---------------------------------------------------------------------------
@@ -152,15 +153,15 @@ LEDLOOP:	LAM 0b01;		// A <= M[0, BL], BU = 1
 			.org 0b1111000000;
 //	Page 15 in the bank is the default place for subroutines
 // ----------------------------------------------------------------------------			
-ROTATE:		LAM 0b00;
-			XCI 0b00;
+ROTATE:		LAM 0b00;	// A = M[x, 15]
+			XCI 0b00;	// BL is now 0
 			NOP;
-ROTLOOP:	XCI 0b00;
-			JMP ROTLOOP;
+ROTLOOP:	XCI 0b00;	// deposit from previously visited memory cell, increment BL
+			JMP ROTLOOP;// continue until all visited
 			RT;
 			
-INIT_LED0:	PP 13;
-			JMP INITLED0_;
+INIT_LED0:	PP 13;			// JMS implicitly calls into page 15, so from here dispatch to page 13
+			JMP INITLED0_;	// using half of 64 nibble RAM as constant storage!!
 			
 INIT_LED1: 	PP 13;
 			JMP INITLED1_;
@@ -169,7 +170,7 @@ DISP_LED:	PP 14;
 			JMP DISP_LED_;
 				
 CRLF:		LAI CR;
-			JMS OUT_0;
+			JMS OUT_0;		// old assembly trick
 			LAI LF;
 OUT_0:		RSM 3;			// set current RAM location to 0
 			RSM 2;
@@ -178,18 +179,18 @@ OUT_xxx0:	RSM 0;
 			OUT;
 			RT;
 			
-H:			LAI 0x0F & 'H';
+H:			LAI 0x0F & 'H';	// using EMZ1001A trick that in a sequence of LAIs only 1st one is executed!
 E:			LAI 0x0F & 'E';
 L:			LAI 0x0F & 'L';
 O:			LAI 0x0F & 'O';
 D:			LAI 0x0F & 'D';
-OUT_4:		RSM 3;
+OUT_4:		RSM 3;			// high nibble is 0b0100 for these ASCII codes
 			STM 2;
 			JMP OUT_xx00;
 
 W:			LAI 0x0F & 'W';
 R:			LAI 0x0F & 'R';
-OUT_5:		RSM 3;
+OUT_5:		RSM 3;			// high nibble is 0b0101 for these W and R ASCII codes
 			STM 2;
 			RSM 1;
 			STM 0;
@@ -203,15 +204,15 @@ OUT_2:		RSM 3;
 			STM 1;
 			JMP OUT_xxx0;
 
-CLEAR4:		LAI 0;
+CLEAR4:		LAI 0;			// clear 4 locations in RAM bank, going backwards
 			XCD 0b00;
-			NOP;
+			NOP;			// don't care if we started at 15, just continue
 			LAI 0;
 			XCD 0b00;
 			LAI 0;
 			XCD 0b00;
 			LAI 0;
 			XCD 0b00;
-			RT;
+			RT;				// tiny bit faster than putting NOP here
 			RT;
 

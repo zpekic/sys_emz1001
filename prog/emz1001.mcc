@@ -3,7 +3,8 @@
 //  More about mcc:  https://github.com/zpekic/MicroCodeCompiler
 //---------------------------------------------------------------------------------------------
 // http://www.bitsavers.org/components/ami/s2000/
-// Full description: (TBD link to hackaday project)
+// Full description: 
+// https://hackaday.io/project/188614-iskra-emz1001a-a-virtual-resurrection/log/214194-recreating-a-simple-emz1001a-assembler
 //---------------------------------------------------------------------------------------------
 // define any slices of the instruction word format
 f76			.valfield 2 values * default 0;
