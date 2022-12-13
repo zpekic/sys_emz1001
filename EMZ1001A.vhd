@@ -53,9 +53,17 @@ end EMZ1001A;
 
 architecture Behavioral of EMZ1001A is
 
--- function defined in the package pulls in the content of internal 1k ROM
-constant bank0: mem1k8 := init_filememory("..\prog\helloworld_code.hex", 1024, X"00");
---constant bank0: mem1k8 := init_filememory("..\prog\fibonacci_code.hex", 1024, X"00");
+component rom1k is
+	generic (
+		filename: string := "";
+		default_value: STD_LOGIC_VECTOR(7 downto 0) := X"00"
+	);
+	Port ( 
+		A : in  STD_LOGIC_VECTOR (9 downto 0);
+		nOE : in  STD_LOGIC;
+		D : out  STD_LOGIC_VECTOR (7 downto 0)
+	);
+end component;
 
 -- PLA constants
 constant skp_0: std_logic_vector(3 downto 0) := X"0";
@@ -256,23 +264,23 @@ skp_0 & alu_nop & opr_lai	-- LAI
 ); 
 
 -- used for PSH (OR, non-inverted) and PSL (AND, inverted)
-constant psx_mask: mem16x32 := (
-	"11111111111111100000000000000001",
-	"11111111111111010000000000000010",
-	"11111111111110110000000000000100",
-	"11111111111101110000000000001000",
-	"11111111111011110000000000010000",
-	"11111111110111110000000000100000",
-	"11111111101111110000000001000000",
-	"11111111011111110000000010000000",
-	"11111110111111110000000100000000",
-	"11111101111111110000001000000000",
-	"11111011111111110000010000000000",
-	"11110111111111110000100000000000",
-	"11101111111111110001000000000000",
-	"11011111111111110010000000000000",
-	"10111111111111110100000000000000",
-	"00000000000000001111111111111111"	-- set (or clear) all bits
+constant psx_mask: mem16x40 := (
+	X"1F" & "11111111111111100000000000000001",
+	X"20" & "11111111111111010000000000000010",
+	X"31" & "11111111111110110000000000000100",
+	X"42" & "11111111111101110000000000001000",
+	X"53" & "11111111111011110000000000010000",
+	X"64" & "11111111110111110000000000100000",
+	X"75" & "11111111101111110000000001000000",
+	X"86" & "11111111011111110000000010000000",
+	X"97" & "11111110111111110000000100000000",
+	X"A8" & "11111101111111110000001000000000",
+	X"B9" & "11111011111111110000010000000000",
+	X"CA" & "11110111111111110000100000000000",
+	X"DB" & "11101111111111110001000000000000",
+	X"EC" & "11011111111111110010000000000000",
+	X"FD" & "10111111111111110100000000000000",
+	X"0E" & "00000000000000001111111111111111"	-- set (or clear) all bits
 );
 
 -- seven segment pattern for DISN instruction
@@ -295,24 +303,24 @@ constant sevseg: mem16x8 := (
 	"01000111"	-- F
 );
 
-constant incdec: mem16x8 := (
-	X"1F",
-	X"20",
-	X"31",
-	X"42",
-	X"53",
-	X"64",
-	X"75",
-	X"86",
-	X"97",
-	X"A8",
-	X"B9",
-	X"CA",
-	X"DB",
-	X"EC",
-	X"FD",
-	X"0E"
-);
+--constant incdec: mem16x8 := (
+--	X"1F",
+--	X"20",
+--	X"31",
+--	X"42",
+--	X"53",
+--	X"64",
+--	X"75",
+--	X"86",
+--	X"97",
+--	X"A8",
+--	X"B9",
+--	X"CA",
+--	X"DB",
+--	X"EC",
+--	X"FD",
+--	X"0E"
+--);
 
 -- EUR lookup
 constant eur_lookup: mem4x14 := (
@@ -348,6 +356,8 @@ signal ir_cnt: std_logic_vector(5 downto 0);		-- counts to 50 or 60, so 6 bits a
 -- 11	ROMS tied to high		-- always internal ROM, regardless of the bank
 signal ir_roms: std_logic_vector(1 downto 0);
 signal ir_introm: std_logic;
+signal introm: std_logic_vector(7 downto 0);	-- internal ROM value addressed by PC
+signal readexternal: std_logic;
 
 -- program control
 signal ir_stack : mem4x10;
@@ -385,9 +395,11 @@ signal bu_xor: std_logic_vector(1 downto 0);
 
 alias i_clk: std_logic is I(3);	-- assume I3 is hooked up to 50/60Hz mains frequency
 
-signal psx: std_logic_vector(31 downto 0);
+signal psx: std_logic_vector(39 downto 0);
 alias psx_ormask: std_logic_vector(15 downto 0) is psx(15 downto 0);
 alias psx_andmask: std_logic_vector(15 downto 0) is psx(31 downto 16);
+alias bl_dec: std_logic_vector(3 downto 0) is psx(35 downto 32);
+alias bl_inc: std_logic_vector(3 downto 0) is psx(39 downto 36); 
 alias bl_is_0: std_logic is psx(0);
 alias bl_is_13: std_logic is psx(13);
 alias bl_is_15: std_logic is psx(15);
@@ -395,13 +407,6 @@ alias bl_is_15: std_logic is psx(15);
 signal eur: std_logic_vector(13 downto 0);	-- combines mains counter limit with xor mask
 alias eur_invert: std_logic_vector(7 downto 0) is eur(7 downto 0);	-- for XOR of DISP, DISN outputs
 alias eur_limit: std_logic_vector(5 downto 0) is eur(13 downto 8);	-- to count toward 1s 
-
-signal bl_incdec: std_logic_vector(7 downto 0);
-alias bl_inc: std_logic_vector(3 downto 0) is bl_incdec(7 downto 4); -- 16 values, 4 bits
-alias bl_dec: std_logic_vector(3 downto 0) is bl_incdec(3 downto 0);
-
---signal e_incdec: std_logic_vector(7 downto 0);
---alias e_inc: std_logic_vector(3 downto 0) is e_incdec(7 downto 4);
 
 signal sp_incdec: std_logic_vector(3 downto 0);
 alias sp_inc: std_logic_vector(1 downto 0) is sp_incdec(3 downto 2);	-- 4 values, 2 bits
@@ -417,6 +422,18 @@ alias opr: std_logic_vector(4 downto 0) is pla(4 downto 0);
 signal dbg_hi, dbg_lo: std_logic_vector(3 downto 0);
 
 begin
+
+-- 1k of internal ROM contains the "Hello world!" program
+firmware: rom1k generic map(
+		filename => "..\prog\helloworld_code.hex",
+		default_value => X"00" -- NOP
+	)	
+	port map(
+		D => introm,
+		A => pc,
+		nOE => '0'
+	);
+
 -- SYNC is low at T1 and T3, high at T5 and T7
 SYNC <= t5 or t7; 
 
@@ -434,13 +451,18 @@ with ir_roms select ir_introm <=
 	'1' 														when "10", -- /SYNC, not implemented test mode, assume "internal"
 	'1' 														when others; -- HI, always internal
 	
+-- determine A, D state when SYNC is low
+readexternal <= (mr_a_multiplexed or (not ir_introm)) when ((t1 or t3) = '1') else '0';	
+
 -- D is either floating, or driven from internal dout
-D <= dout; -- when (mr_d_driven = '1') else "ZZZZZZZZ";
+--D <= dout; -- when (mr_d_driven = '1') else "ZZZZZZZZ";
+D <= "ZZZZZZZZ" when (readexternal = '1') else dout;
+ 
 -- internal dout is RAM & A when execution OUT instruction, or output latch otherwise
 dout <= (ram & mr_a) when (out_exe = '1') else ir_dout;
 
 -- A is either program address of output latch
-A <= (ir_bank & pc) when ((mr_a_multiplexed and (t1 or t3)) = '1') else ir_slave;
+A <= (ir_bank & pc) when (readexternal = '1') else ir_slave;
 
 -- constant values set by EUR
 eur <= eur_lookup(to_integer(unsigned(ir_eur)));
@@ -483,10 +505,6 @@ skp_mask <= X"00" when (ir_skp = '1') else X"FF";
 -- prepare output data for DISN and DISB
 disn_out <= eur_invert xor (mr_cy & sevseg(to_integer(unsigned(mr_a)))(6 downto 0));	-- combine carry with lower 7 bits of 7seg lookup
 disb_out <= eur_invert xor (ram & mr_a);																-- combine RAM and A
-
--- save a few adders
-bl_incdec <= incdec(to_integer(unsigned(mr_bl)));
---e_incdec <= incdec(to_integer(unsigned(mr_e)));
 
 with ir_sp select sp_incdec <=
 	"0111" when "00",
@@ -563,6 +581,7 @@ begin
 		-- one hot ring counter will start at T1
 		t <= "0001";
 		-- initialize some regs
+		ir_roms <= "00";	-- assume internal ROM
 		ir_lai <= '1';		-- this is why first instruction should not be LAI
 		ir_lbx <= '1'; 	-- this is why first instruction should not be LBE, LBEP, LBF, LBZ
 		ir_eur <= "01";	-- 60Hz, normal polarity
@@ -588,7 +607,7 @@ begin
 				-- T3: regardless of skip, load instruction register
 					if (ir_introm = '1') then
 						-- fetch from bank0 which is inside the chip
-						ir_current <= skp_mask and bank0(to_integer(unsigned(pc)));
+						ir_current <= skp_mask and introm;
 					else
 						-- fetch from any bank, outside of the chip
 						ir_current <= skp_mask and D;

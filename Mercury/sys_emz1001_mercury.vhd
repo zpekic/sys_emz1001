@@ -131,19 +131,19 @@ component EMZ1001A is
 			  );
 end component;
 
--- Misc components
-component fourdigitsevensegled is
-    Port ( -- inputs
-			  hexdata : in  STD_LOGIC_VECTOR (3 downto 0);
-           digsel : in  STD_LOGIC_VECTOR (1 downto 0);
-           showdigit : in  STD_LOGIC_VECTOR (3 downto 0);
-           showdot : in  STD_LOGIC_VECTOR (3 downto 0);
-			  -- outputs
-           anode : out  STD_LOGIC_VECTOR (3 downto 0);
-           segment : out  STD_LOGIC_VECTOR (7 downto 0)
-			 );
+component rom1k is
+	generic (
+		filename: string := "";
+		default_value: STD_LOGIC_VECTOR(7 downto 0) := X"00"
+	);
+	Port ( 
+		A : in  STD_LOGIC_VECTOR (9 downto 0);
+		nOE : in  STD_LOGIC;
+		D : out  STD_LOGIC_VECTOR (7 downto 0)
+	);
 end component;
 
+-- Misc components
 component clockgen is
     Port ( CLK : in  STD_LOGIC;
            RESET : in  STD_LOGIC;
@@ -180,23 +180,6 @@ component ttyvgawin is
            debug : out  STD_LOGIC_VECTOR (31 downto 0));
 end component;
 
-component debouncer8channel is
-    Port ( clock : in STD_LOGIC;
-           reset : in STD_LOGIC;
-           signal_raw : in STD_LOGIC_VECTOR (7 downto 0);
-           signal_debounced : out STD_LOGIC_VECTOR (7 downto 0));
-end component;
-
-component uart_ser2par is
-    Port ( reset : in  STD_LOGIC;
-           rxd_clk : in  STD_LOGIC;
-           mode : in  STD_LOGIC_VECTOR (2 downto 0);
-           char : out  STD_LOGIC_VECTOR (7 downto 0);
-           ready : buffer  STD_LOGIC;
-           valid : out  STD_LOGIC;
-           rxd : in  STD_LOGIC);
-end component;
-
 component uart_par2ser is
     Port ( reset : in  STD_LOGIC;
 			  txd_clk: in STD_LOGIC;
@@ -206,6 +189,35 @@ component uart_par2ser is
            ready : buffer STD_LOGIC;
            txd : out  STD_LOGIC);
 end component;
+
+--component debouncer8channel is
+--    Port ( clock : in STD_LOGIC;
+--           reset : in STD_LOGIC;
+--           signal_raw : in STD_LOGIC_VECTOR (7 downto 0);
+--           signal_debounced : out STD_LOGIC_VECTOR (7 downto 0));
+--end component;
+--
+--component uart_ser2par is
+--    Port ( reset : in  STD_LOGIC;
+--           rxd_clk : in  STD_LOGIC;
+--           mode : in  STD_LOGIC_VECTOR (2 downto 0);
+--           char : out  STD_LOGIC_VECTOR (7 downto 0);
+--           ready : buffer  STD_LOGIC;
+--           valid : out  STD_LOGIC;
+--           rxd : in  STD_LOGIC);
+--end component;
+--
+--component fourdigitsevensegled is
+--    Port ( -- inputs
+--			  hexdata : in  STD_LOGIC_VECTOR (3 downto 0);
+--           digsel : in  STD_LOGIC_VECTOR (1 downto 0);
+--           showdigit : in  STD_LOGIC_VECTOR (3 downto 0);
+--           showdot : in  STD_LOGIC_VECTOR (3 downto 0);
+--			  -- outputs
+--           anode : out  STD_LOGIC_VECTOR (3 downto 0);
+--           segment : out  STD_LOGIC_VECTOR (7 downto 0)
+--			 );
+--end component;
 
 -- mask for a 16*16 window on VGA screen to display EMZ1001 internal data
 -- i00tmmmm -- hex value selected by "mmmm" looked up throug table "t" and possibly "i"nverted
@@ -251,10 +263,6 @@ constant lookup1: mem16x8 := (
 	c('?')
 );
 
--- "External ROM" in bank 0 holds Fibonacci code
-constant bank0: mem1k8 := init_filememory("..\prog\fibonacci_code.hex", 1024, X"00");
-signal extrom: std_logic_vector(7 downto 0);
-
 signal RESET: std_logic;
 
 -- Connect to PmodUSBUART 
@@ -266,6 +274,10 @@ alias PMOD_CTS: std_logic is PMOD(3);
 
 --
 signal switch: std_logic_vector(7 downto 0);
+alias sw_run: std_logic is switch(7);
+alias sw_cpuclk: std_logic_vector(2 downto 0) is switch(6 downto 4);
+alias sw_internalrom: std_logic is switch(3);
+alias sw_baudrate: std_logic_vector(2 downto 0) is switch(2 downto 0);
 
 --
 signal button: std_logic_vector(3 downto 0);
@@ -290,10 +302,13 @@ signal mask_index: std_logic_vector(7 downto 0);
 signal win_mask, win_char: std_logic_vector(7 downto 0);
 signal win_hex: std_logic_vector(3 downto 0);
 
+-- 7seg LED
+signal blank: std_logic;
+
 -- EMZ1001A bus
 signal A: std_logic_vector(12 downto 0);
 signal D: std_logic_vector(7 downto 0);
-signal SYNC: std_logic;
+signal SYNC, ROMS: std_logic;
 signal emz_i: std_logic_vector(3 downto 0);
 signal emz_nExt: std_logic;
 -- EMZ1001A debug
@@ -304,29 +319,36 @@ signal dbg_mem, dbg_reg: std_logic_vector(3 downto 0);
 signal dbg_tty: std_logic_vector(31 downto 0);
 signal hexdata: std_logic_vector(3 downto 0);
 signal digsel: std_logic_vector(2 downto 0);
-
  
 begin   
 
 -- master reset
 RESET <= USR_BTN;
 
--- external ROM
---D <= bank0(to_integer(unsigned(A))) when (SYNC = '0') else "ZZZZZZZZ";
+-- 1k of external ROM contains the "Fibonacci" program
+appware: rom1k generic map(
+		filename => "..\prog\fibonacci_code.hex",
+		default_value => X"00" -- NOP
+	)	
+	port map(
+		D => D,
+		A => A(9 downto 0),
+		nOE => SYNC
+	);
 
 -- microcontroller!
 mc: EMZ1001A Port map ( 
 			CLK => cpu_clk,
 			nPOR => not RESET,
-			RUN => switch(7),
-			ROMS => '1',	-- only use internal ROM for program
+			RUN => sw_run,
+			ROMS => ROMS,
 			KREF => '1',	-- not used
 			K => button(3 downto 0),
 			I => emz_i,
 --			I(3) => freq50Hz,	-- simulate 50Hz European mains frequency
 --			I(2 downto 0) => "000",
 			nEXTERNAL => emz_nExt,
-			SYNC => open,
+			SYNC => SYNC,
 			STATUS => open,
 			A => A,
 			D => D,
@@ -336,14 +358,17 @@ mc: EMZ1001A Port map (
 			dbg_reg => dbg_reg
 		);
 
+-- use internal ROM when switch(3) is on, or external when off
+ROMS <= sw_internalrom or SYNC;
+
 emz_i <= freq50Hz & switch(2 downto 0);
 
 -- generate various frequencies
 clocks: clockgen Port map ( 
 		CLK => CLK, 	-- 50MHz on Mercury board
 		RESET => RESET,
-		baudrate_sel => switch(2 downto 0),
-		cpuclk_sel =>	 switch(6 downto 4),
+		baudrate_sel => sw_baudrate,
+		cpuclk_sel =>	 sw_cpuclk,
 		pulse => btn_ss,
 		cpu_clk => cpu_clk,
 		debounce_clk => debounce_clk,
@@ -373,7 +398,7 @@ video: ttyvgawin port map (
 		row => vga_row,
 		col => vga_col,
 		win => win,
-		win_color => switch(7), -- TODO, drive from window data
+		win_color => sw_internalrom,	-- show internal and external ROMs in different colors 
 		win_char(7) => win_mask(7),
 		win_char(6 downto 0) => win_char(6 downto 0),
 		tty_send => tx_send,
@@ -439,9 +464,12 @@ LED(1) <= PMOD_TXD;
 --LED(2) <= PMOD_RXD;
 --LED(3) <= rx_ready;
 	
-DOT <= D(7) when (switch(7) = '1') else '0';
-A_TO_G <= D(6 downto 0) when (switch(7) = '1') else "0000000";
-AN <= A(3 downto 0) when (switch(7) = '1') else "0000";
+-- when using external ROM, prevent A and D messing up the LEDs when SYNC is low
+blank <= not (SYNC or sw_internalrom);
+	
+DOT <= D(7);
+A_TO_G <= D(6 downto 0);
+AN <= "1111" when (blank = '1') else A(3 downto 0);
 	
 -- 7seg LED debug
 --sevenseg: fourdigitsevensegled Port map (

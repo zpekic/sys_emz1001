@@ -31,7 +31,7 @@ type mem256x8 is array(0 to 255) of std_logic_vector(7 downto 0);
 type mem512x8 is array(0 to 511) of std_logic_vector(7 downto 0);
 type mem64x12 is array(0 to 63) of std_logic_vector(11 downto 0);
 type mem64x4 is array(0 to 63) of std_logic_vector(3 downto 0);
-type mem16x32 is array (0 to 15) of std_logic_vector(31 downto 0);
+type mem16x40 is array (0 to 15) of std_logic_vector(39 downto 0);
 type mem16x16 is array (0 to 15) of std_logic_vector(15 downto 0);
 type mem16x8 is array(0 to 15) of std_logic_vector(7 downto 0);
 type mem4x14 is array(0 to 3) of std_logic_vector(13 downto 0);
