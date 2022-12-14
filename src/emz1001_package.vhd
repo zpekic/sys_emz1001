@@ -13,9 +13,6 @@ use IEEE.NUMERIC_STD.ALL;
 use STD.textio.all;
 use ieee.std_logic_textio.all;
 
---use work.fibonacci_code.all;
---use work.helloworld_code.all;
-
 package emz1001_package is
 
 constant char_zero: std_logic_vector(7 downto 0) := X"00";
@@ -39,7 +36,6 @@ type mem4x10 is array(0 to 3) of std_logic_vector(9 downto 0);
 
 
 impure function init_filememory(file_name : in string; depth: in integer; default_value: std_logic_vector(7 downto 0)) return mem1k8;
---impure function firmware(sel: in integer) return mem512x8;
 
 constant hex2ascii: mem16x8 := (
 	c('0'),
@@ -202,44 +198,5 @@ begin
    return temp_mem;
 	
 end init_filememory;
-
---
---impure function firmware(sel: in integer) return mem512x8 is
---variable temp: mem512x8;
---begin
---	if (sel = 0) then
---		assert true report "FIRMWARE: start initializing (fibonacci example)" severity note;
-----		for i in 0 to 1023 loop
-----			if ((i < 256) or (i >= 768)) then 
-----				temp(i) := fib_microcode(i);
-----			end if;
-----		end loop;
---		for i in 0 to 511 loop
---			if (i > 255) then
---				temp(i) := fib_microcode(i + 512);
---			else
---				temp(i) := fib_microcode(i);
---			end if;
---		end loop;
---	else
---		assert true report "FIRMWARE: start initializing (helloworld example)" severity note;
-----		for i in 0 to 1023 loop
-----			if ((i < 256) or (i >= 768)) then 
-----				temp(i) := hlw_microcode(i);
-----			end if;
-----		end loop;
---		for i in 0 to 511 loop
---			if (i > 255) then
---				temp(i) := hlw_microcode(i + 512);
---			else
---				temp(i) := hlw_microcode(i);
---			end if;
---		end loop;
---	end if;
---	
---	assert true report "FIRMWARE: done initializing" severity note;
---
---	return temp;
---end firmware;
 
 end emz1001_package;

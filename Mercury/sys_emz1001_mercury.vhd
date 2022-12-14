@@ -190,43 +190,19 @@ component uart_par2ser is
            txd : out  STD_LOGIC);
 end component;
 
---component debouncer8channel is
---    Port ( clock : in STD_LOGIC;
---           reset : in STD_LOGIC;
---           signal_raw : in STD_LOGIC_VECTOR (7 downto 0);
---           signal_debounced : out STD_LOGIC_VECTOR (7 downto 0));
---end component;
---
---component uart_ser2par is
---    Port ( reset : in  STD_LOGIC;
---           rxd_clk : in  STD_LOGIC;
---           mode : in  STD_LOGIC_VECTOR (2 downto 0);
---           char : out  STD_LOGIC_VECTOR (7 downto 0);
---           ready : buffer  STD_LOGIC;
---           valid : out  STD_LOGIC;
---           rxd : in  STD_LOGIC);
---end component;
---
---component fourdigitsevensegled is
---    Port ( -- inputs
---			  hexdata : in  STD_LOGIC_VECTOR (3 downto 0);
---           digsel : in  STD_LOGIC_VECTOR (1 downto 0);
---           showdigit : in  STD_LOGIC_VECTOR (3 downto 0);
---           showdot : in  STD_LOGIC_VECTOR (3 downto 0);
---			  -- outputs
---           anode : out  STD_LOGIC_VECTOR (3 downto 0);
---           segment : out  STD_LOGIC_VECTOR (7 downto 0)
---			 );
---end component;
+component debouncer is
+    Port ( clock : in  STD_LOGIC;
+           reset : in  STD_LOGIC;
+           signal_in : in  STD_LOGIC;
+           signal_out : out  STD_LOGIC);
+end component;
 
 -- mask for a 16*16 window on VGA screen to display EMZ1001 internal data
 -- i00tmmmm -- hex value selected by "mmmm" looked up throug table "t" and possibly "i"nverted
 -- ixxxxxxx -- all other characters are ASCII, possibly "i"verted
 constant mask: mem256x8 := (
---	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('='),i(' '),i(' '),X"07" ,X"06" ,X"05" , X"04",
---	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i('='),i(' '),i(' '),i(' '),i(' '),X"03" , X"02",
-	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('E'),i('M'),i('Z'),i('1'),i('0'),i('0'),i('1'),i('A'),
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i(' '),i(' '),i(' '),i('T'),X"11",
+	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '),i(' '),i(' '),i('R'),i('O'),i('M'),i('S'),X"01",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('H'),i('I'),i(' '),i(' '),i(' '),X"07", X"06",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('A'),i('L'),i('O'),i(' '),i(' '),i(' '),X"05", X"04",
 	i(' '), X"00",i(' '), X"00",i(' '), X"00",i(' '), X"00",i('D'),i(' '),i(' '),i(' '),i(' '),i(' '),X"03", X"02",
@@ -471,50 +447,26 @@ DOT <= D(7);
 A_TO_G <= D(6 downto 0);
 AN <= "1111" when (blank = '1') else A(3 downto 0);
 	
--- 7seg LED debug
---sevenseg: fourdigitsevensegled Port map (
---		-- inputs
---		hexdata => hexdata,
---		digsel => digsel(1 downto 0),
---		showdigit => "1111",
---		showdot => "0101",
---		-- outputs
---		anode => AN,
---		segment(7) => DOT,
---		segment(6 downto 0) => A_TO_G
---	);
---	
---digsel <= switch(7) & freq50Hz & freq100Hz;
---
---with digsel select hexdata <= 
---		dbg_tty(31 downto 28) when O"7",
---		dbg_tty(27 downto 24) when O"6",
---		dbg_tty(23 downto 20) when O"5",
---		dbg_tty(19 downto 16) when O"4",
---		dbg_tty(15 downto 12) when O"3",
---		dbg_tty(11 downto 8) when O"2",
---		dbg_tty(7 downto 4) when O"1",
---		dbg_tty(3 downto 0) when others;
-		
--- condition input signals (switches and buttons)
---	debounce_sw: debouncer8channel Port map ( 
---		clock => debounce_clk, 
---		reset => RESET,
---		signal_raw => SW,
---		signal_debounced => switch
---	);
-
-switch <= SW;
-
---	debounce_btn: debouncer8channel Port map ( 
---		clock => debounce_clk, 
---		reset => RESET,
---		signal_raw(7 downto 4) => "0000",
---		signal_raw(3 downto 0) => BTN,
---		signal_debounced(7 downto 4) => open,
---		signal_debounced(3 downto 0) => button
---	);
+-- generate 4 debouncers for buttons and 8 for switches to clean input signals
+debouncer_generate: for i in 0 to 7 generate
+begin
+	dbc: if (i < 4) generate
+		db_btn: debouncer port map 
+		(
+			clock => debounce_clk,
+			reset => RESET,
+			signal_in => BTN(i),
+			signal_out => button(i)
+		);
+	end generate;
 	
-button <= BTN;
+	db_sw: debouncer port map 
+	(
+		clock => debounce_clk,
+		reset => RESET,
+		signal_in => SW(i),
+		signal_out => switch(i)
+	);
+end generate;
 		
 end;

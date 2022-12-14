@@ -357,7 +357,7 @@ signal ir_cnt: std_logic_vector(5 downto 0);		-- counts to 50 or 60, so 6 bits a
 signal ir_roms: std_logic_vector(1 downto 0);
 signal ir_introm: std_logic;
 signal introm: std_logic_vector(7 downto 0);	-- internal ROM value addressed by PC
-signal readexternal: std_logic;
+signal readexternal, readdata: std_logic;
 
 -- program control
 signal ir_stack : mem4x10;
@@ -455,8 +455,8 @@ with ir_roms select ir_introm <=
 readexternal <= (mr_a_multiplexed or (not ir_introm)) when ((t1 or t3) = '1') else '0';	
 
 -- D is either floating, or driven from internal dout
---D <= dout; -- when (mr_d_driven = '1') else "ZZZZZZZZ";
-D <= "ZZZZZZZZ" when (readexternal = '1') else dout;
+readdata <= (not mr_d_driven) when ((t5 or t7) = '1') else '0';
+D <= "ZZZZZZZZ" when ((readexternal or readdata) = '1') else dout;
  
 -- internal dout is RAM & A when execution OUT instruction, or output latch otherwise
 dout <= (ram & mr_a) when (out_exe = '1') else ir_dout;
@@ -823,7 +823,7 @@ dbg_mem <= mr_ram(to_integer(unsigned(dbg_sel)));
 -- 	3		2		1		0
 ----------------------------
 --	0	-		- 		0		T		-- ring counter clock
--- 1	- 		- 		0		T		-- ring counter clock
+-- 1	- 		- 		0		R		-- ROMS mode
 -- 2	- 		-		A		A		-- A output buffer
 -- 3	- 		-		A		A		-- A output buffer
 -- 4	- 		-	 	D		D		--	D output buffer
@@ -861,7 +861,8 @@ with dbg_sel(3 downto 0) select dbg_lo <=
 	ir_dout(3 downto 0) 		when X"4",
 	ir_slave(3 downto 0) 	when X"3",
 	ir_slave(11 downto 8) 	when X"2",
-	t 								when others;
+	"00" & ir_roms 			when X"1",
+	t								when others;
 	
 with dbg_sel(3 downto 0) select dbg_hi <=
 	'0' & pc(5 downto 3) 	when X"F",	-- PC: location as octal
