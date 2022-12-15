@@ -552,7 +552,7 @@ with skp select y_skp <=
 		(not bit_is_1) when skp_bit,	
 		bl_is_15 when skp_blf,
 		bl_is_0 when skp_bl0, 
-		not(ik(3) and ik(2) and ik(1) and ik(0)) when skp_ik,	-- at least 1 zero detected in I or K after masking	
+		not(ik(3) or ik(2) or ik(1) or ik(0)) when skp_ik,	-- at least 1 zero detected in I or K after masking	
 		ir_skp when skp_skp,	-- do not change skip flag, pass it to next instruction
 		mr_f1 when skp_f1,
 		mr_f2 when skp_f2,
@@ -571,8 +571,8 @@ with ir_current(1 downto 0) select bit_is_1 <=
 
 -- SZK and SZI 
 with ir_current(0) select ik <= 
-	(ir_k or ir_mask) when '0', 		-- SZK 0x28
-	(ir_i or ir_mask) when others; 	-- SZI 0x29
+	(ir_k and ir_mask) when '0', 		-- SZK 0x28
+	(ir_i and ir_mask) when others; 	-- SZI 0x29
 	
 -- most action happens on clock falling edge
 on_clk_down: process(CLK, nPOR)

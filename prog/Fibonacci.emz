@@ -14,6 +14,7 @@
 
 CR:			.alias 0xD;
 LF:			.alias 0xA;
+OUT_READY:	.alias 1;			// mask for I inputs
 
 //	---------------------------------------------------------------------------
 			.org 0;
@@ -67,6 +68,12 @@ DISP_TTY:	LAI 12;			// start displaying at digit 12
 TTYLOOP:	LAI 3;			// ASCII digits 0..9 are hex 0x30 to 0x39
 			XC 0;			// keep BU, M.A is now 3.x
 			OUT;			// D pins <= 3X, strobe EXT low
+			XAE;			// save to E reg
+WAIT_DIGIT:	LAI OUT_READY;	
+			SZI;
+			JMP CONT;
+			JMP WAIT_DIGIT;
+CONT:		XAE;			// restore
 			XCD	0b00;		// next, do not change column
 			JMP TTYLOOP;
 CRLF:		RSM 3;			// clear M[BU, BL]
@@ -75,9 +82,16 @@ CRLF:		RSM 3;			// clear M[BU, BL]
 			RSM 0;
 			LAI CR;			// High nibble from M, low nibble from A give ASCII code
 			OUT;
-			LAI LF;			// Line feed ASCII code
+WAIT_CR:	LAI OUT_READY;
+			SZI;
+			JMP OUT_LF;
+			JMP WAIT_CR;
+OUT_LF:		LAI LF;			// Line feed ASCII code
 			OUT;
+WAIT_LF:	LAI OUT_READY;
+			SZI;
 			RT;
+			JMP WAIT_LF;
 
 //	---------------------------------------------------------------------------
 			.org 0b1111000000;
@@ -109,6 +123,8 @@ LEDLOOP:	LAM 0b00;		// A <= M[BU, BL]
 			PSL;			// prepare digit low (on)
 			MVS;			// update A pins (A[BL] <= '0')
 			NOP;			// delay to keep it lit for a bit
+			NOP;
+			NOP;
 			NOP;
 			NOP;
 			NOP;

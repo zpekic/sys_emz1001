@@ -268,7 +268,7 @@ signal freq100Hz, freq50Hz, freq1Hz: std_logic;
 
 -- loopback
 signal rx_char, tx_char: std_logic_vector(7 downto 0);
-signal rx_ready, tx_send: std_logic;
+signal rx_ready, tx_send, tx_ready, tty_sent: std_logic;
 
 -- video
 signal vga_row, vga_col: std_logic_vector(7 downto 0);
@@ -319,10 +319,12 @@ mc: EMZ1001A Port map (
 			RUN => sw_run,
 			ROMS => ROMS,
 			KREF => '1',	-- not used
-			K => button(3 downto 0),
-			I => emz_i,
---			I(3) => freq50Hz,	-- simulate 50Hz European mains frequency
---			I(2 downto 0) => "000",
+			K => button,
+			I => emz_i,		-- I(3) and I(0) used
+--			I(3) => freq50Hz,		-- simulate 50Hz European mains frequency
+--			I(2) => '0',
+--			I(1) => '0',
+--			I(0) => tx_ready,	-- to check if next char can be sent to UART
 			nEXTERNAL => emz_nExt,
 			SYNC => SYNC,
 			STATUS => open,
@@ -337,7 +339,8 @@ mc: EMZ1001A Port map (
 -- use internal ROM when switch(3) is on, or external when off
 ROMS <= sw_internalrom or SYNC;
 
-emz_i <= freq50Hz & switch(2 downto 0);
+-- feed for SOS and SZI
+emz_i <= freq50Hz & "00" & (tx_ready and tty_sent);
 
 -- generate various frequencies
 clocks: clockgen Port map ( 
@@ -379,7 +382,7 @@ video: ttyvgawin port map (
 		win_char(6 downto 0) => win_char(6 downto 0),
 		tty_send => tx_send,
 		tty_char => tx_char,
-		tty_sent => open,
+		tty_sent => tty_sent,
 		debug => open --dbg_tty
 	  );
 
@@ -430,7 +433,7 @@ uart_tx: uart_par2ser Port map (
 		send => tx_send,
 		mode => "000",	-- 8N1
 		data => tx_char,
-		ready => open,
+		ready => tx_ready,
 		txd => PMOD_RXD
 		);		
 		

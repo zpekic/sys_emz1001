@@ -23,6 +23,7 @@ LED_W:		.alias 0b00111111;	// close enough
 LED_R:		.alias 0b00000101;	// r
 LED_D:		.alias 0b00111101;	// d
 LED_EXCL:	.alias 0b10110000;	// ! (note decimal point is on)
+OUT_READY:	.alias 1;			// mask for I inputs
 
 //	---------------------------------------------------------------------------
 			.org 0;
@@ -176,8 +177,11 @@ OUT_0:		RSM 3;			// set current RAM location to 0
 			RSM 2;
 OUT_xx00:	RSM 1;
 OUT_xxx0:	RSM 0;
-			OUT;
-			RT;
+UART_OUT:	OUT;
+UART_WAIT:	LAI OUT_READY;	// connected to pins 0, 1 of I inputs
+			SZI;			// skip if low
+			RT;				// signal high, ready
+			JMP UART_WAIT;	// signal low, not ready
 			
 H:			LAI 0x0F & 'H';	// using EMZ1001A trick that in a sequence of LAIs only 1st one is executed!
 E:			LAI 0x0F & 'E';
@@ -194,8 +198,7 @@ OUT_5:		RSM 3;			// high nibble is 0b0101 for these W and R ASCII codes
 			STM 2;
 			RSM 1;
 			STM 0;
-			OUT;
-			RT;
+			JMP UART_OUT;
 			
 SPACE:		LAI 0x0F & ' ';
 EXCPOINT:	LAI 0x0F & '!';
