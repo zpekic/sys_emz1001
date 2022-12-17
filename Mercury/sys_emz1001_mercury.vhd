@@ -48,22 +48,22 @@ entity sys_emz1001_mercury is
 				USR_BTN: in std_logic; 
 
 				-- Switches on baseboard
-				-- SW(0) -- 
-				-- SW(1) -- 
-				-- SW(2) -- 
-				-- SW(3) -- 
-				-- SW(4) -- 
-				-- SW(5) -- 
-				-- SW(6) -- 
-				-- SW(7)	-- 
+				-- SW(0) -- BAUDRATE SEL 0
+				-- SW(1) -- BAUDRATE SEL 1
+				-- SW(2) -- BAUDRATE SEL 2
+				-- SW(3) -- OFF: EXTERNAL ROM, ON: INTERNAL ROM
+				-- SW(4) -- CPUCLK SEL 0
+				-- SW(5) -- CPUCLK SEL 1
+				-- SW(6) -- CPUCLK SEL 2
+				-- SW(7)	-- OFF: STOP, ON: RUN
 
 				SW: in std_logic_vector(7 downto 0); 
 
 				-- Push buttons on baseboard
-				-- BTN0 - not used, test DP3 on 7seg LED
-				-- BTN1 - not used, test DP2 on 7seg LED
-				-- BTN2 - not used, test DP1 on 7seg LED
-				-- BTN3 - not used, test DP0 on 7seg LED
+				-- BTN0 - single step (effective if SW(6 downto 4)) = "000"
+				-- BTN1 - not used
+				-- BTN2 - not used
+				-- BTN3 - not used
 				BTN: in std_logic_vector(3 downto 0); 
 
 				-- Stereo audio output on baseboard
@@ -292,9 +292,9 @@ signal dbg_sel: std_logic_vector(5 downto 0);
 signal dbg_mem, dbg_reg: std_logic_vector(3 downto 0); 
  
 -- other
-signal dbg_tty: std_logic_vector(31 downto 0);
-signal hexdata: std_logic_vector(3 downto 0);
-signal digsel: std_logic_vector(2 downto 0);
+--signal dbg_tty: std_logic_vector(31 downto 0);
+--signal hexdata: std_logic_vector(3 downto 0);
+--signal digsel: std_logic_vector(2 downto 0);
  
 begin   
 
@@ -320,11 +320,7 @@ mc: EMZ1001A Port map (
 			ROMS => ROMS,
 			KREF => '1',	-- not used
 			K => button,
-			I => emz_i,		-- I(3) and I(0) used
---			I(3) => freq50Hz,		-- simulate 50Hz European mains frequency
---			I(2) => '0',
---			I(1) => '0',
---			I(0) => tx_ready,	-- to check if next char can be sent to UART
+			I => emz_i,		-- only I(3) and I(0) used
 			nEXTERNAL => emz_nExt,
 			SYNC => SYNC,
 			STATUS => open,
@@ -424,8 +420,8 @@ with win_mask(3 downto 0) select win_hex <=
 --		rxd => PMOD_TXD
 --		);
 
-tx_char <= D; --rx_char;
-tx_send <= not (emz_nExt); --rx_ready;
+tx_char <= D; 
+tx_send <= not (emz_nExt); 
 		
 uart_tx: uart_par2ser Port map (
 		reset => RESET,
@@ -438,10 +434,8 @@ uart_tx: uart_par2ser Port map (
 		);		
 		
 -- LEDs
-LED(0) <= emz_nExt; --cpu_clk;
+LED(0) <= emz_nExt; 
 LED(1) <= PMOD_TXD;
---LED(2) <= PMOD_RXD;
---LED(3) <= rx_ready;
 	
 -- when using external ROM, prevent A and D messing up the LEDs when SYNC is low
 blank <= not (SYNC or sw_internalrom);
