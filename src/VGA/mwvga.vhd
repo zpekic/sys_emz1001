@@ -58,14 +58,14 @@ component chargen_rom is
 			);
 end component;
 
--- basic colors (BBBBGGGGRRRR)
+-- basic colors (RRRRGGGGBBBB)
 constant color8_black : std_logic_vector(11 downto 0) := X"000"; 
 constant color8_red	 : std_logic_vector(11 downto 0) := X"F00"; 
 constant color8_green : std_logic_vector(11 downto 0) := X"0F0"; 
-constant color8_yellow: std_logic_vector(11 downto 0) := X"FF0"; 
 constant color8_blue	 : std_logic_vector(11 downto 0) := X"00F"; 
+constant color8_cyan  : std_logic_vector(11 downto 0) := X"0FF"; 
 constant color8_purple: std_logic_vector(11 downto 0) := X"F0F"; 
-constant color8_cyan	 : std_logic_vector(11 downto 0) := X"0FF"; 
+constant color8_yellow: std_logic_vector(11 downto 0) := X"FF0"; 
 constant color8_white : std_logic_vector(11 downto 0) := X"FFF"; 
 
 type table8x12 is array(0 to 7) of std_logic_vector(11 downto 0);
@@ -76,8 +76,8 @@ constant palette: table8x12 :=(
 	color8_cyan,
 	color8_black,
 	color8_red,
-	color8_yellow,
-	color8_green
+	color8_black,
+	color8_yellow
 	);
 
 signal hpulse, h, hfp: std_logic_vector(11 downto 0);

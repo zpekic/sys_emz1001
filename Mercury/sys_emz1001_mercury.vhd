@@ -291,11 +291,7 @@ signal emz_nExt: std_logic;
 signal dbg_sel: std_logic_vector(5 downto 0);
 signal dbg_mem, dbg_reg: std_logic_vector(3 downto 0); 
  
--- other
---signal dbg_tty: std_logic_vector(31 downto 0);
---signal hexdata: std_logic_vector(3 downto 0);
---signal digsel: std_logic_vector(2 downto 0);
- 
+
 begin   
 
 -- master reset
@@ -373,7 +369,7 @@ video: ttyvgawin port map (
 		row => vga_row,
 		col => vga_col,
 		win => win,
-		win_color => sw_internalrom,	-- show internal and external ROMs in different colors 
+		win_color => sw_run,	-- show run and stop mode in different colors 
 		win_char(7) => win_mask(7),
 		win_char(6 downto 0) => win_char(6 downto 0),
 		tty_send => tx_send,
