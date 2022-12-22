@@ -426,7 +426,7 @@ begin
 -- 1k of internal ROM contains the "Hello world!" program
 firmware: rom1k generic map(
 		filename => "..\prog\helloworld_code.hex",
-		default_value => X"00" -- NOP
+		default_value => nop
 	)	
 	port map(
 		D => introm,
@@ -534,9 +534,9 @@ with alu select y_alu <=
 		mr_cy & (mr_a xor X"F") & '0' 	when alu_cma,
 		mr_cy & (mr_a and ram) & '0' 		when alu_and,
 		mr_cy & (mr_a xor ram) & '0' 		when alu_xor,
-		std_logic_vector(unsigned('0' & mr_a & mr_cy) + unsigned('0' & ram & mr_cy)) 						when alu_adcs,
+		std_logic_vector(unsigned('0' & mr_a & mr_cy) + unsigned('0' & ram & mr_cy)) 		when alu_adcs,
 		std_logic_vector(unsigned('0' & mr_a & '0') + unsigned('0' & ir_current(3 downto 0) & '0')) 	when alu_adis,
-		std_logic_vector(unsigned('0' & mr_a & '0') + unsigned('0' & ram & '0')) 							when alu_add,
+		mr_cy & std_logic_vector(unsigned(mr_a & '0') + unsigned(ram & '0')) 							when alu_add,
 		not(ir_current(0)) & mr_a & '0'	when alu_cry,	-- passthrough to set carry flag
 		mr_cy & mr_a & '0' 					when others;
 
@@ -586,6 +586,8 @@ begin
 		ir_lbx <= '1'; 	-- this is why first instruction should not be LBE, LBEP, LBF, LBZ
 		ir_eur <= "01";	-- 60Hz, normal polarity
 		mr_master <= (others => '0');	-- static operation, float D lines
+		ir_current <= nop;	-- prevent stray instruction
+		ir_skp <= '0';			-- prevent stray skip
 		-- start at bank 0, page 0, location 0
 		ir_pp <= "00";						-- no pages set
 		ir_bank <= "000";					-- start at bank 0 (usually internal firmware)
@@ -675,7 +677,12 @@ begin
 										mr_master <= mr_master and psx_andmask; -- PSL
 									end if;
 								when opr_alu =>	-- ADD, ADCS, ADIS, AND, XOR, CMA, STC, RSC 
-									mr_cy <= y_alu(5); 
+									-- ADIS must generate carry out for skip, but should not store it!
+									if (ir_current(7 downto 4) = "0101") then
+										mr_cy <= mr_cy;
+									else 
+										mr_cy <= y_alu(5); 
+									end if;
 									mr_a <= y_alu(4 downto 1);
 								when opr_xae =>	-- XAE
 									mr_e <= mr_a;	

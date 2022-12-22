@@ -18,6 +18,7 @@ package emz1001_package is
 constant char_zero: std_logic_vector(7 downto 0) := X"00";
 constant char_lf: std_logic_vector(7 downto 0) := X"0A";
 constant char_cr: std_logic_vector(7 downto 0) := X"0D";
+constant nop: std_logic_vector(7 downto 0) := X"00";
 
 impure function c(char: in character) return std_logic_vector;
 impure function i(char: in character) return std_logic_vector;

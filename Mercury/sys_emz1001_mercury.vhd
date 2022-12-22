@@ -300,7 +300,7 @@ RESET <= USR_BTN;
 -- 1k of external ROM contains the "Fibonacci" program
 appware: rom1k generic map(
 		filename => "..\prog\fibonacci_code.hex",
-		default_value => X"00" -- NOP
+		default_value => nop
 	)	
 	port map(
 		D => D,
