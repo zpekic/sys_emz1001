@@ -42,7 +42,7 @@ DEADLOOP: 	LBZ 0;			// select RAM column 0, row 0
 			XCD 0b00;		// BL = 13, keep BU
 			PSL;			// set static operation 
 				
-ADDLOOP:	JMS  BCDADD;	// RAM[2,*] = RAM[1,*] + RAM[2,*]
+ADDLOOP:	JMS  BCDADD;	// RAM[2,*] = RAM[0,*] + RAM[1,*]
 			SZC;			// check for overflow
 			JMP	DEADLOOP;	// carry from most significant digit means overflow, start from scratch 
 			PP 14;			// prepare for page 14 (instead of usual 15)
