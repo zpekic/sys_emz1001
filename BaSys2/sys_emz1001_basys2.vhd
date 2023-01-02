@@ -46,7 +46,7 @@ entity sys_emz1001_basys2 is
 				
 				-- Switches on baseboard
 				-- SW(0) -- 
-				-- SW(1) -- OFF: TIM-011 video (512*256, 4 colors), ON: V99X8 video (256*192, 16 colors)
+				-- SW(1) -- 
 				-- SW(2) -- 
 				-- SW(3) -- 
 				-- SW(4) -- 
@@ -220,10 +220,10 @@ signal RESET: std_logic;
 
 -- Connect to PmodUSBUART 
 -- https://digilent.com/reference/pmod/pmodusbuart/reference-manual
-alias PMOD_RTS: std_logic is PIO(84);	
-alias PMOD_RXD: std_logic is PIO(85);
-alias PMOD_TXD: std_logic is PIO(86);
-alias PMOD_CTS: std_logic is PIO(87);	
+alias PMOD_RTS: std_logic is PIO(84);	-- JD
+alias PMOD_RXD: std_logic is PIO(85);	-- JD
+alias PMOD_TXD: std_logic is PIO(86);	-- JD
+alias PMOD_CTS: std_logic is PIO(87);	-- JD
 
 --
 signal switch: std_logic_vector(7 downto 0);
