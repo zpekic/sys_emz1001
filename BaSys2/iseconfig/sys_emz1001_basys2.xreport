@@ -1,11 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <report-views version="2.0" >
  <header>
-  <DateModified>2023-01-03T00:32:26</DateModified>
+  <DateModified>2023-09-23T09:44:35</DateModified>
   <ModuleName>sys_emz1001_basys2</ModuleName>
   <SummaryTimeStamp>2023-01-03T00:27:10</SummaryTimeStamp>
   <SavedFilePath>C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/BaSys2/iseconfig/sys_emz1001_basys2.xreport</SavedFilePath>
-  <ImplementationReportsDirectory>C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/BaSys2</ImplementationReportsDirectory>
+  <ImplementationReportsDirectory>C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/BaSys2\</ImplementationReportsDirectory>
   <DateInitialized>2022-12-23T21:28:04</DateInitialized>
   <EnableMessageFiltering>true</EnableMessageFiltering>
  </header>

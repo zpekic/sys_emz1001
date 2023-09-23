@@ -20,13 +20,13 @@
          <ClosedNode>/uart_receiver - Behavioral C:|Users|zoltanp|Documents|HexCalc|sys_emz1001|sys_emz1001|src|uart_receiver.vhd</ClosedNode>
       </ClosedNodes>
       <SelectedItems>
-         <SelectedItem>video - ttyvgawin - Behavioral (C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/src/VGA/ttyvgawin.vhd)</SelectedItem>
+         <SelectedItem>sys_emz1001_mercury - Structural (C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/Mercury/sys_emz1001_mercury.vhd)</SelectedItem>
       </SelectedItems>
-      <ScrollbarPosition orientation="vertical" >6</ScrollbarPosition>
-      <ScrollbarPosition orientation="horizontal" >39</ScrollbarPosition>
+      <ScrollbarPosition orientation="vertical" >0</ScrollbarPosition>
+      <ScrollbarPosition orientation="horizontal" >0</ScrollbarPosition>
       <ViewHeaderState orientation="horizontal" >000000ff00000000000000010000000100000000000000000000000000000000020200000001000000010000006400000374000000020000000000000000000000000200000064ffffffff000000810000000300000002000003740000000100000003000000000000000100000003</ViewHeaderState>
       <UserChangedColumnWidths orientation="horizontal" >true</UserChangedColumnWidths>
-      <CurrentItem>video - ttyvgawin - Behavioral (C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/src/VGA/ttyvgawin.vhd)</CurrentItem>
+      <CurrentItem>sys_emz1001_mercury - Structural (C:/Users/zoltanp/Documents/HexCalc/sys_emz1001/sys_emz1001/Mercury/sys_emz1001_mercury.vhd)</CurrentItem>
    </ItemView>
    <ItemView engineview="SynthesisOnly" sourcetype="DESUT_VHDL_ARCHITECTURE" guiview="Process" >
       <ClosedNodes>
@@ -40,13 +40,13 @@
          <ClosedNode>User Constraints</ClosedNode>
       </ClosedNodes>
       <SelectedItems>
-         <SelectedItem></SelectedItem>
+         <SelectedItem>Generate Programming File</SelectedItem>
       </SelectedItems>
       <ScrollbarPosition orientation="vertical" >0</ScrollbarPosition>
       <ScrollbarPosition orientation="horizontal" >0</ScrollbarPosition>
-      <ViewHeaderState orientation="horizontal" >000000ff000000000000000100000001000000000000000000000000000000000000000000000001b7000000010000000100000000000000000000000064ffffffff000000810000000000000001000001b70000000100000000</ViewHeaderState>
+      <ViewHeaderState orientation="horizontal" >000000ff0000000000000001000000010000000000000000000000000000000000000000000000017e000000010000000100000000000000000000000064ffffffff0000008100000000000000010000017e0000000100000000</ViewHeaderState>
       <UserChangedColumnWidths orientation="horizontal" >false</UserChangedColumnWidths>
-      <CurrentItem></CurrentItem>
+      <CurrentItem>Generate Programming File</CurrentItem>
    </ItemView>
    <ItemView guiview="File" >
       <ClosedNodes>
